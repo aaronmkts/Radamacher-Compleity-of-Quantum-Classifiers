@@ -14,4 +14,17 @@ import math
 from datasets import gen_data
 from model import get_classifier
 
-print(gen_data(1000, 2))
+#Hyperparameters
+
+epochs = 1
+batch_size = 25 
+learning_rate = 0.01 
+num_samples = 1000
+dimensions = 2 
+
+
+
+# Data
+samples, labels = gen_data(num_samples, dimensions)
+
+print(samples.shape, labels.shape) # (1000, 2) (1000,)
