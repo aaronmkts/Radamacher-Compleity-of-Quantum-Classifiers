@@ -4,7 +4,7 @@ from .amplitude import AmplitudeEmbeddingClassifier
 
 
 
-def select_classifier(name: str):
+def get_classifier(name: str):
     match name:
         case "reuploading":
             return Reuploading_classifier()

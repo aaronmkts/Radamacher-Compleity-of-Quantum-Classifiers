@@ -11,5 +11,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import time
 import math
-from dataset.mnist_dataset import get_mnist_dataloaders
-from model import QML_classifier
+from datasets import gen_data
+from model import get_classifier
+
+print(gen_data(1000, 2))
