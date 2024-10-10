@@ -1,1 +1,2 @@
-from .mnist import get_mnist_dataloaders
+from .classical_data import gen_data
+
