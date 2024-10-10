@@ -44,3 +44,4 @@ def loss_func(samples, labels):
 
     return 1/(1+torch.exp(labels*expect))
 
+
