@@ -35,6 +35,13 @@ print(samples.shape, labels.shape) # (1000, 2) (1000,)
 
 # Model
 classifier = get_classifier(name)
-output = classifier(num_qubits = num_qubits, num_layers=layers)(samples)
+#output = classifier(num_qubits = num_qubits, num_layers=layers)(samples)
 
-print(output)
+#print(output)
+
+def loss_func(samples, labels):
+    expect=classifier(num_qubits=num_qubits, num_layers=layers)(samples)
+
+    return 1/(1+torch.exp(labels*expect))
+
+
