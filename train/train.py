@@ -16,117 +16,263 @@ from datasets import gen_data
 from model import get_classifier
 from torch.utils.data import TensorDataset, DataLoader, random_split
 
-#General hyperparameters
-epochs = 25
-learning_rate = 0.002 
-
-#Data hyperparameters
-num_samples = 1000
-dimensions = 2
+# General hyperparameters
+epochs = 1
+learning_rate = 0.002
+epsilon = 0.5
+# Data hyperparameters
+num_samples = 2000
 train_split = 0.8
-batch_size = 2**3
-
-x, y = gen_data(num_samples, dimensions)
-dataset = TensorDataset(x, y) 
-
-train_size = int(train_split * len(dataset))
-test_size = len(dataset) - train_size
-train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
-
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-#Model hyperparameters
-name = 'amplitude'
+batch_size = 8  # Adjust if necessary
+# Model hyperparameters
 layers = 2
-num_qubits = dimensions if name in ['angle', 'reuploading'] else int(np.ceil(np.log2(dimensions)))
-num_reup = 3 * num_qubits * layers // dimensions
 
+dimensions_list = [2, 4, 8, 16]
+embeddings_list = ['angle', 'amplitude']
+loss_differences_dict = {'angle': [], 'amplitude': []}
 
-classifier_fn = get_classifier(name)
-if name == 'reuploading':
-    classifier = classifier_fn(num_qubits=num_qubits, num_layers=layers, num_reup=num_reup)
-else:
-    classifier = classifier_fn(num_qubits=num_qubits, num_layers=layers)
+for name in embeddings_list:
+    print(f"\nProcessing embedding: {name}")
+    loss_differences = []
 
-# Training loop
+    for dimensions in dimensions_list:
+        print(f"\nProcessing dimension: {dimensions}")
 
-def loss_func(expvals, labels):
-    # Ensure that expvals and labels are of the same shape
-    
-    loss = torch.mean(1 / (1 + torch.exp(labels * expvals)))
-    return loss
+        # List to store loss differences for multiple runs
+        loss_differences_runs = []
 
-optimizer = optim.Adam(classifier.parameters(), lr=learning_rate)
+        for run in range(5):
+            print(f"Run {run + 1}/5")
 
-train_loss_list = []
-test_loss_list = []
+            # Generate data for the current dimension
+            x, y = gen_data(num_samples, dimensions)
+            dataset = TensorDataset(x, y)
 
-for epoch in range(epochs):
-    classifier.train()  # Set model to training mode
-    running_loss = 0.0
-    train_loss_epoch = 0.0
+            # Split the dataset
+            train_size = int(train_split * len(dataset))
+            test_size = len(dataset) - train_size
+            train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
-    for batch_idx, (inputs, labels) in enumerate(train_loader):
-        labels = (-1) ** labels.float()
+            train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+            test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-        optimizer.zero_grad()
+            if name in ['angle', 'reuploading']:
+                num_qubits = dimensions
+            else:
+                num_qubits = int(np.ceil(np.log2(dimensions)))
 
+            num_reup = 3 * num_qubits * layers // dimensions
 
-        # Forward pass with combined data
-        outputs = classifier(inputs)
-        outputs = outputs.view(-1)
+            classifier_fn = get_classifier(name)
+            if name == 'reuploading':
+                classifier = classifier_fn(num_qubits=num_qubits, num_layers=layers, num_reup=num_reup)
+            else:
+                classifier = classifier_fn(num_qubits=num_qubits, num_layers=layers)
 
-        # Compute loss
-        loss = loss_func(outputs, labels)
+            # Training loop
+            def loss_func(expvals, labels):
+                loss = torch.mean(1 / (1 + torch.exp(labels * expvals)))
+                return loss
 
-        # Backward pass and optimization
-        loss.backward()
-        optimizer.step()
+            optimizer = optim.Adam(classifier.parameters(), lr=learning_rate)
 
-        # Accumulate loss
-        running_loss += loss.item()
-        train_loss_epoch += loss.item()
+            train_loss_list = []
+            test_loss_list = []
 
-        # Print statistics every 10 batches
-        if (batch_idx + 1) % 10 == 0:
-            print(f'Epoch [{epoch + 1}/{epochs}], Batch [{batch_idx + 1}/{len(train_loader)}], '
-                  f'Loss: {running_loss / 10:.4f}')
-            running_loss = 0.0
+            for epoch in range(epochs):
+                classifier.train()  # Set model to training mode
+                running_loss = 0.0
+                train_loss_epoch = 0.0
 
-    # **Calculate average training loss for the epoch**
-    train_loss_epoch /= len(train_loader)
-    train_loss_list.append(train_loss_epoch)
+                for batch_idx, (inputs, labels) in enumerate(train_loader):
+                    labels = (-1) ** labels.float()
 
-    # **Evaluate on the test set**
-    classifier.eval()  
-    test_loss_epoch = 0.0
+                    optimizer.zero_grad()
 
-    with torch.no_grad():
-        for inputs, labels in test_loader:
-            labels = (-1) ** labels.float()
-            outputs = classifier(inputs)
-            outputs = outputs.view(-1)
-            labels = labels.view(-1)
+                    # Forward pass with combined data
+                    outputs = classifier(inputs)
+                    outputs = outputs.view(-1)
 
-            # Compute loss
-            loss = loss_func(outputs, labels)
-            test_loss_epoch += loss.item()
+                    # Compute loss
+                    loss = loss_func(outputs, labels)
 
-    # **Calculate average testing loss for the epoch**
-    test_loss_epoch /= len(test_loader)
-    test_loss_list.append(test_loss_epoch)
+                    # Backward pass and optimization
+                    loss.backward()
+                    optimizer.step()
 
-    print(f'Epoch [{epoch + 1}/{epochs}] completed. Train Loss: {train_loss_epoch:.4f}, Test Loss: {test_loss_epoch:.4f}\n')
+                    # Accumulate loss
+                    running_loss += loss.item()
+                    train_loss_epoch += loss.item()
 
-print('Training Finished.')
+                # Calculate average training loss for the epoch
+                train_loss_epoch /= len(train_loader)
+                train_loss_list.append(train_loss_epoch)
 
-# **Plot the training and testing losses**
+                # Evaluate on the test set
+                classifier.eval()
+                test_loss_epoch = 0.0
+
+                with torch.no_grad():
+                    for inputs, labels in test_loader:
+                        labels = (-1) ** labels.float()
+                        outputs = classifier(inputs)
+                        outputs = outputs.view(-1)
+                        labels = labels.view(-1)
+
+                        # Compute loss
+                        loss = loss_func(outputs, labels)
+                        test_loss_epoch += loss.item()
+
+                # Calculate average testing loss for the epoch
+                test_loss_epoch /= len(test_loader)
+                test_loss_list.append(test_loss_epoch)
+
+                print(f'Epoch [{epoch + 1}/{epochs}] completed. Train Loss: {train_loss_epoch:.4f}, Test Loss: {test_loss_epoch:.4f}')
+
+            print('Training Finished.')
+
+            def FGSM(model, inputs, labels, loss_func, epsilon=0.2):
+                # Ensure inputs require gradients
+                inputs_adv = inputs.clone().detach().requires_grad_(True)
+                labels_adv = labels.clone().detach()
+
+                # Zero gradients
+                model.zero_grad()
+
+                # Forward pass
+                outputs = model(inputs_adv)
+                outputs = outputs.view(-1)
+
+                # Compute loss
+                loss = loss_func(outputs, labels_adv)
+
+                # Backward pass
+                loss.backward()
+
+                # Update adversarial inputs
+                with torch.no_grad():
+                    # Apply gradient ascent to maximize the loss
+                    inputs_adv += epsilon * inputs_adv.grad.sign()
+
+                return inputs_adv.detach()
+
+            def generate_adversarial_dataset(model, data_loader, loss_func, epsilon=0.001, percentage=0.025):
+                model.eval()  # Set model to evaluation mode
+                adv_examples = []
+                adv_labels = []
+
+                total_samples = len(data_loader.dataset)
+                limit_samples = int(percentage * total_samples)
+                processed_samples = 0
+
+                for inputs, labels in data_loader:
+                    if processed_samples >= limit_samples:
+                        break  # Stop processing after reaching the limit of samples
+
+                    # Determine how many samples to process in this batch
+                    remaining_samples = limit_samples - processed_samples
+                    batch_size = inputs.size(0)
+                    if remaining_samples < batch_size:
+                        # Take only the required number of samples from this batch
+                        inputs = inputs[:remaining_samples]
+                        labels = labels[:remaining_samples]
+                        batch_size = remaining_samples  # Update batch_size for this iteration
+
+                    # Transform labels if necessary
+                    labels_adv = (-1) ** labels.float()
+                    inputs_adv = FGSM(model, inputs, labels_adv, loss_func, epsilon=epsilon)
+                    adv_examples.append(inputs_adv)
+                    adv_labels.append(labels)
+
+                    processed_samples += batch_size
+
+                # Concatenate all adversarial examples and labels
+                adv_examples = torch.cat(adv_examples, dim=0)
+                adv_labels = torch.cat(adv_labels, dim=0)
+
+                return adv_examples, adv_labels
+
+            # Generate adversarial datasets
+            adv_train_samples, adv_train_labels = generate_adversarial_dataset(
+                model=classifier,
+                data_loader=train_loader,
+                loss_func=loss_func,
+                epsilon=epsilon,
+                percentage=0.025
+            )
+
+            adv_test_samples, adv_test_labels = generate_adversarial_dataset(
+                model=classifier,
+                data_loader=test_loader,
+                loss_func=loss_func,
+                epsilon=epsilon,
+                percentage=1
+            )
+
+            # Evaluate on adversarial train samples
+            adv_train_dataset = TensorDataset(adv_train_samples, adv_train_labels)
+            adv_train_loader = DataLoader(adv_train_dataset, batch_size=batch_size, shuffle=False)
+
+            classifier.eval()  # Ensure the model is in evaluation mode
+            adv_train_loss = 0.0
+
+            with torch.no_grad():
+                for inputs, labels in adv_train_loader:
+                    labels = (-1) ** labels.float()
+                    outputs = classifier(inputs)
+                    outputs = outputs.view(-1)
+                    labels = labels.view(-1)
+
+                    # Compute loss
+                    loss = loss_func(outputs, labels)
+                    adv_train_loss += loss.item() * inputs.size(0)
+
+            adv_train_loss /= len(adv_train_dataset)
+            print(f'Adversarial Train Loss: {adv_train_loss:.4f}')
+
+            # Evaluate on adversarial test samples
+            adv_test_dataset = TensorDataset(adv_test_samples, adv_test_labels)
+            adv_test_loader = DataLoader(adv_test_dataset, batch_size=batch_size, shuffle=False)
+
+            adv_test_loss = 0.0
+
+            with torch.no_grad():
+                for inputs, labels in adv_test_loader:
+                    labels = (-1) ** labels.float()
+                    outputs = classifier(inputs)
+                    outputs = outputs.view(-1)
+                    labels = labels.view(-1)
+
+                    # Compute loss
+                    loss = loss_func(outputs, labels)
+                    adv_test_loss += loss.item() * inputs.size(0)
+
+            adv_test_loss /= len(adv_test_dataset)
+            print(f'Adversarial Test Loss: {adv_test_loss:.4f}')
+
+            # Compute the modulus of the difference
+            loss_difference = abs(adv_train_loss - adv_test_loss)
+            print(f'Modulus of the Loss Difference for dimension {dimensions}: {loss_difference:.4f}')
+
+            # Append the loss difference to the list for this run
+            loss_differences_runs.append(loss_difference)
+
+        # After 5 runs, pick the maximum loss difference for this dimension
+        max_loss_difference = max(loss_differences_runs)
+        loss_differences.append(max_loss_difference)
+        print(f'Maximum Modulus of the Loss Difference for dimension {dimensions}: {max_loss_difference:.4f}')
+
+    # After processing all dimensions for this embedding, store the loss_differences
+    loss_differences_dict[name] = loss_differences
+
+# Plot the modulus of the loss differences against dimensions for both embeddings
 plt.figure()
-plt.plot(range(1, epochs + 1), train_loss_list, label='Train Loss')
-plt.plot(range(1, epochs + 1), test_loss_list, label='Test Loss')
-plt.xlabel('Epoch')
-plt.ylabel('Loss')
-plt.title('Training and Testing Loss over Epochs')
+for name in embeddings_list:
+    plt.plot(dimensions_list, loss_differences_dict[name], marker='o', label=name)
+
+plt.xlabel('Dimensions (d)')
+plt.ylabel('Modulus of the Loss Difference (Max over 5 runs)')
+plt.title('Max Modulus of Loss Difference vs Dimensions')
+plt.grid(True)
 plt.legend()
 plt.show()

@@ -26,7 +26,7 @@ class AngleEmbeddingClassifier(torch.nn.Module):
         self.num_layers = num_layers
 
         # Quantum device setup
-        self.device = qml.device("lightning.qubit", wires=self.num_qubits)
+        self.device = qml.device("default.qubit", wires=self.num_qubits)
 
         # Shape of the weights for the variational circuit
         self.weights_shape = qml.StronglyEntanglingLayers.shape(
@@ -59,3 +59,6 @@ class AngleEmbeddingClassifier(torch.nn.Module):
     def forward(self, x):
    
         return self.qcircuit(x)
+
+
+

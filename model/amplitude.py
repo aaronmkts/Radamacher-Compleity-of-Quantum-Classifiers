@@ -26,7 +26,7 @@ class AmplitudeEmbeddingClassifier(torch.nn.Module):
         self.num_layers = num_layers
 
         # Quantum device setup
-        self.device = qml.device("lightning.qubit", wires=self.num_qubits)
+        self.device = qml.device("default.qubit", wires=self.num_qubits)
 
         # Shape of the weights for the variational circuit
         self.weights_shape = qml.StronglyEntanglingLayers.shape(
@@ -36,7 +36,7 @@ class AmplitudeEmbeddingClassifier(torch.nn.Module):
         paulis = [qml.PauliZ(i) for i in range(self.num_qubits)]
         self.observable =  functools.reduce(operator.matmul, paulis)
         # Define the quantum circuit
-        @qml.qnode(self.device)
+        @qml.qnode(self.device, diff_method="backprop")
         def circuit(inputs, weights):
             # Amplitude embedding of the inputs
             qml.AmplitudeEmbedding(features=inputs, wires=range(self.num_qubits), normalize=True)
