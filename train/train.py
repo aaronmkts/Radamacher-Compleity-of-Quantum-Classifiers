@@ -18,8 +18,8 @@ from torch.utils.data import TensorDataset, DataLoader, random_split
 
 # General hyperparameters
 epochs = 1
-learning_rate = 0.002
-epsilon = 0.5
+learning_rate = 0.02
+epsilon = 0.05
 # Data hyperparameters
 num_samples = 2000
 train_split = 0.8
