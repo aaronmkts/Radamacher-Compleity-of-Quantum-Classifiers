@@ -78,3 +78,10 @@ for epoch in range(epochs):
 
 
 print('Training Finished.')
+
+def loss_func(samples, labels):
+    expect=classifier(num_qubits=num_qubits, num_layers=layers)(samples)
+
+    return 1/(1+torch.exp(labels*expect))
+
+
