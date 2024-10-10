@@ -11,9 +11,10 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import time
 import math
+import numpy as np
 from datasets import gen_data
 from model import get_classifier
-import numpy as np
+from torch.utils.data import TensorDataset, DataLoader
 
 #Hyperparameters
 epochs = 1
@@ -29,15 +30,54 @@ num_qubits = dimensions if name in ['angle', 'reuploading'] else np.ceil(np.log2
 
 
 # Data
-samples, labels = gen_data(num_samples, dimensions)
-print(samples.shape, labels.shape) # (1000, 2) (1000,)
-
+x, y = gen_data(num_samples, dimensions)
+dataset = TensorDataset(x, y) 
+dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 # Model
 classifier = get_classifier(name)
-#output = classifier(num_qubits = num_qubits, num_layers=layers)(samples)
+classifier = classifier(num_qubits=num_qubits, num_layers=layers)
 
-#print(output)
+# Loss function and optimizer
+criterion = nn.BCEWithLogitsLoss()
+optimizer = optim.Adam(classifier.parameters(), lr=learning_rate)
+
+# Training loop
+for epoch in range(epochs):
+    running_loss = 0.0
+
+
+    for batch_idx, (inputs, labels) in enumerate(dataloader):
+        # Move inputs and labels to device
+        inputs, labels = inputs, labels
+
+        # Zero the parameter gradients
+        optimizer.zero_grad()
+
+        # Forward pass
+        outputs = classifier(inputs)
+        # Flatten outputs and labels to shape [batch_size]
+        outputs = outputs.view(-1)
+        labels = labels.view(-1)
+
+        # Compute loss
+        loss = criterion(outputs, labels)
+
+        # Backward pass and optimization
+        loss.backward()
+        optimizer.step()
+
+        # Accumulate loss
+        running_loss += loss.item()
+
+        # Print statistics every 10 batches
+        if (batch_idx + 1) % 10 == 0:
+            print(f'Epoch [{epoch + 1}/{epochs}], Batch [{batch_idx + 1}/{len(dataloader)}], '
+                  f'Loss: {running_loss / 10:.4f}')
+            running_loss = 0.0
+
+
+print('Training Finished.')
 
 def loss_func(samples, labels):
     expect=classifier(num_qubits=num_qubits, num_layers=layers)(samples)
