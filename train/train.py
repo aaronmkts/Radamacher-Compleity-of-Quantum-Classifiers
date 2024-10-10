@@ -17,17 +17,17 @@ from model import get_classifier
 from torch.utils.data import TensorDataset, DataLoader
 
 #Hyperparameters
-epochs = 1
-batch_size = 25 
+epochs = 5
+batch_size = 1
 learning_rate = 0.01 
 num_samples = 1000
-dimensions = 2 
+dimensions = 4
 
 # Model
-name = 'angle'
+name = 'amplitude'
 layers = 2
-num_qubits = dimensions if name in ['angle', 'reuploading'] else np.ceil(np.log2(dimensions))
-
+num_qubits = dimensions if name in ['angle', 'reuploading'] else int(np.ceil(np.log2(dimensions)))
+num_reup = 3 * num_qubits * layers // dimensions
 
 # Data
 x, y = gen_data(num_samples, dimensions)
@@ -35,33 +35,41 @@ dataset = TensorDataset(x, y)
 dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 # Model
-classifier = get_classifier(name)
-classifier = classifier(num_qubits=num_qubits, num_layers=layers)
+classifier_fn = get_classifier(name)
+if name == 'reuploading':
+    classifier = classifier_fn(num_qubits=num_qubits, num_layers=layers, num_reup=num_reup)
+else:
+    classifier = classifier_fn(num_qubits=num_qubits, num_layers=layers)
 
 # Loss function and optimizer
-criterion = nn.BCEWithLogitsLoss()
+def loss_func(expvals, labels):
+    # Ensure that expvals and labels are of the same shape
+    loss = torch.mean(1 / (1 + torch.exp(labels * expvals)))
+    return loss
+
 optimizer = optim.Adam(classifier.parameters(), lr=learning_rate)
 
 # Training loop
 for epoch in range(epochs):
     running_loss = 0.0
 
-
     for batch_idx, (inputs, labels) in enumerate(dataloader):
-        # Move inputs and labels to device
-        inputs, labels = inputs, labels
-
+        # Move inputs and labels to device if using GPU
+        inputs, labels = inputs, (-1) ** labels
+        
+        
         # Zero the parameter gradients
         optimizer.zero_grad()
-
+        
         # Forward pass
         outputs = classifier(inputs)
+   
         # Flatten outputs and labels to shape [batch_size]
         outputs = outputs.view(-1)
         labels = labels.view(-1)
-
+       
         # Compute loss
-        loss = criterion(outputs, labels)
+        loss = loss_func(outputs, labels)
 
         # Backward pass and optimization
         loss.backward()
@@ -76,12 +84,5 @@ for epoch in range(epochs):
                   f'Loss: {running_loss / 10:.4f}')
             running_loss = 0.0
 
-
 print('Training Finished.')
-
-def loss_func(samples, labels):
-    expect=classifier(num_qubits=num_qubits, num_layers=layers)(samples)
-
-    return 1/(1+torch.exp(labels*expect))
-
 

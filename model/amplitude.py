@@ -9,11 +9,10 @@ print("Using device:", device)
 class AmplitudeEmbeddingClassifier(torch.nn.Module):
     """
     Class for creating a quantum machine learning (classification) model
-    based on the StronglyEntanglingLayers template using amplitude embedding
+    based on the StronglyEntanglingLayers template using angle embedding
     without data reuploading.
 
     Args:
-        input_dim (int): Dimension of the input samples (must be 2^num_qubits).
         output_dim (int): Number of output classes.
         num_qubits (int): Number of qubits in the circuit.
         num_layers (int): Number of layers within the StronglyEntanglingLayers template.
@@ -21,8 +20,7 @@ class AmplitudeEmbeddingClassifier(torch.nn.Module):
     def __init__(self, num_qubits, num_layers):
         super().__init__()
         torch.manual_seed(1337)  # Fixed seed for reproducibility
-     
-        self.num_qubits = num_qubits
+        self.num_qubits = int(num_qubits)
         self.num_layers = num_layers
 
         # Quantum device setup
@@ -55,5 +53,5 @@ class AmplitudeEmbeddingClassifier(torch.nn.Module):
         )
 
     def forward(self, x):
-        # Pass the input directly to the quantum circuit
+   
         return self.qcircuit(x)

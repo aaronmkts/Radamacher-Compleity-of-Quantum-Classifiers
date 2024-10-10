@@ -48,5 +48,6 @@ class Reuploading_classifier(torch.nn.Module):
         )
 
     def forward(self, x):
+
         inputs_stack = torch.hstack([x] * self.num_reup)
         return self.qcircuit(inputs_stack)
