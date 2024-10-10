@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+
 def gen_data(m, d):
     x = np.zeros((m,d))
     y = np.random.randint(0, 2, m)

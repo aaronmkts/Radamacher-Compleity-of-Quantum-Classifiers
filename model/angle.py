@@ -1,6 +1,8 @@
 import torch
 import pennylane as qml
 import numpy as np
+import functools
+import operator
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
@@ -31,15 +33,17 @@ class AngleEmbeddingClassifier(torch.nn.Module):
             n_layers=self.num_layers, n_wires=self.num_qubits
         )
 
+        paulis = [qml.PauliZ(i) for i in range(self.num_qubits)]
+        self.observable =  functools.reduce(operator.matmul, paulis)
         # Define the quantum circuit
         @qml.qnode(self.device)
         def circuit(inputs, weights):
             # Angle embedding of the inputs
-            qml.AngleEmbedding(features=inputs, wires=range(self.num_qubits))
+            qml.AngleEmbedding(features=inputs, wires=range(self.num_qubits), rotation='Y')
             # Variational layers
             qml.StronglyEntanglingLayers(weights=weights, wires=range(self.num_qubits))
             # Measurement
-            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(self.num_qubits - 1))
+            return qml.expval(self.observable)
 
         # Initialize the parameters for the quantum circuit
         param_shapes = {"weights": self.weights_shape}
