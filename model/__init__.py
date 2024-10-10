@@ -7,10 +7,10 @@ from .amplitude import AmplitudeEmbeddingClassifier
 def get_classifier(name: str):
     match name:
         case "reuploading":
-            return Reuploading_classifier()
+            return Reuploading_classifier
         case "angle":
-            return AngleEmbeddingClassifier()
+            return AngleEmbeddingClassifier
         case "amplitude":
-            return AmplitudeEmbeddingClassifier()
+            return AmplitudeEmbeddingClassifier
         case _:
             raise ValueError(f"Unknown classifier: {name}")

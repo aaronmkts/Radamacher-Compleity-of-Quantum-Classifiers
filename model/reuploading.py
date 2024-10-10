@@ -1,14 +1,6 @@
-#### Hyperparameters ####
 import torch
 import pennylane as qml
 import numpy as np
-
-
-input_dim = 256
-num_classes = 4
-num_layers = 32
-num_qubits = 8
-num_reup = 3
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
@@ -24,11 +16,12 @@ class Reuploading_classifier(torch.nn.Module):
         num_qubits: the number of qubits in the circuit
         num_layers: the number of layers within the StronglyEntanglingLayers template
     """
-    def __init__(self, input_dim, output_dim, num_qubits, num_layers):
+    def __init__(self, num_qubits, num_layers, num_reup):
         super().__init__()
         torch.manual_seed(1337)  # fixed seed for reproducibility
+
+        self.num_reup = num_reup
         self.num_qubits = num_qubits
-        self.output_dim = output_dim
         self.num_layers = num_layers
         self.device = qml.device("lightning.qubit", wires=self.num_qubits)
         self.weights_shape = qml.StronglyEntanglingLayers.shape(
@@ -41,7 +34,7 @@ class Reuploading_classifier(torch.nn.Module):
             qml.StronglyEntanglingLayers(
                 weights=weights * inputs + bias, wires=range(self.num_qubits)
             )
-            return [qml.expval(qml.PauliZ(i)) for i in range(self.output_dim)]
+            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(self.num_qubits - 1))
 
         param_shapes = {"weights": self.weights_shape, "bias": self.weights_shape}
         init_vals = {
@@ -55,5 +48,5 @@ class Reuploading_classifier(torch.nn.Module):
         )
 
     def forward(self, x):
-        inputs_stack = torch.hstack([x] * num_reup)
+        inputs_stack = torch.hstack([x] * self.num_reup)
         return self.qcircuit(inputs_stack)

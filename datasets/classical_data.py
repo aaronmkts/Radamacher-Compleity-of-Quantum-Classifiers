@@ -1,14 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
+import torch
 def gen_data(m, d):
-    x=np.zeros((m,d))
+    x = np.zeros((m,d))
     y = np.random.randint(0, 2, m)
 
     for i in range (m):
         mu = (-np.ones(d)) ** y[i]
         x[i,:]=np.random.normal(mu, np.ones(d))
-
+        
+    x = torch.tensor(x)
+    y = torch.tensor(y) 
     return x, y
 
 """

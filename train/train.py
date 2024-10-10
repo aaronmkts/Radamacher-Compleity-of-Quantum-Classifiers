@@ -13,18 +13,28 @@ import time
 import math
 from datasets import gen_data
 from model import get_classifier
+import numpy as np
 
 #Hyperparameters
-
 epochs = 1
 batch_size = 25 
 learning_rate = 0.01 
 num_samples = 1000
 dimensions = 2 
 
+# Model
+name = 'angle'
+layers = 2
+num_qubits = dimensions if name in ['angle', 'reuploading'] else np.ceil(np.log2(dimensions))
 
 
 # Data
 samples, labels = gen_data(num_samples, dimensions)
-
 print(samples.shape, labels.shape) # (1000, 2) (1000,)
+
+
+# Model
+classifier = get_classifier(name)
+output = classifier(num_qubits = num_qubits, num_layers=layers)(samples)
+
+print(output)
