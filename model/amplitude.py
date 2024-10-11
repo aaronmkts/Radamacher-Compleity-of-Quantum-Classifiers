@@ -8,6 +8,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
 
+seed = 42
+np.random.seed(seed)
+torch.manual_seed(seed)
+
 class AmplitudeEmbeddingClassifier(torch.nn.Module):
     """
     Class for creating a quantum machine learning (classification) model
@@ -21,7 +25,7 @@ class AmplitudeEmbeddingClassifier(torch.nn.Module):
     """
     def __init__(self, num_qubits, num_layers):
         super().__init__()
-        torch.manual_seed(1337)  # Fixed seed for reproducibility
+        
         self.num_qubits = int(num_qubits)
         self.num_layers = num_layers
 
@@ -29,7 +33,7 @@ class AmplitudeEmbeddingClassifier(torch.nn.Module):
         self.device = qml.device("default.qubit", wires=self.num_qubits)
 
         # Shape of the weights for the variational circuit
-        self.weights_shape = qml.StronglyEntanglingLayers.shape(
+        self.weights_shape = qml.BasicEntanglerLayers.shape(
             n_layers=self.num_layers, n_wires=self.num_qubits
         )
 
@@ -41,7 +45,7 @@ class AmplitudeEmbeddingClassifier(torch.nn.Module):
             # Amplitude embedding of the inputs
             qml.AmplitudeEmbedding(features=inputs, wires=range(self.num_qubits), normalize=True)
             # Variational layers
-            qml.StronglyEntanglingLayers(weights=weights, wires=range(self.num_qubits))
+            qml.BasicEntanglerLayers(weights=weights, wires=range(self.num_qubits))
             # Measurement
             return qml.expval(self.observable)
 

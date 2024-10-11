@@ -14,15 +14,20 @@ import math
 import numpy as np
 from datasets import gen_data
 from model import get_classifier
-from torch.utils.data import TensorDataset, DataLoader, random_split
+from torch.utils.data import TensorDataset, DataLoader, random_split, Subset
+
+seed = 42
+np.random.seed(seed)
+torch.manual_seed(seed)
+
 
 # General hyperparameters
 epochs = 1
 learning_rate = 0.02
-epsilon = 3.
+epsilon = 2
 # Data hyperparameters
-num_samples = 2000
-train_split = 0.8
+num_samples = 1000
+train_split = 0.5
 batch_size = 8  # Adjust if necessary
 # Model hyperparameters
 layers = 2
@@ -35,14 +40,16 @@ for name in embeddings_list:
     print(f"\nProcessing embedding: {name}")
     loss_differences = []
 
+    runs = 5 if name == 'angle' else 20
+
     for dimensions in dimensions_list:
         print(f"\nProcessing dimension: {dimensions}")
 
         # List to store loss differences for multiple runs
         loss_differences_runs = []
 
-        for run in range(5):
-            print(f"Run {run + 1}/5")
+        for run in range(runs):
+            print(f"Run {run + 1}/{runs}")
 
             # Generate data for the current dimension
             x, y = gen_data(num_samples, dimensions)
@@ -86,6 +93,7 @@ for name in embeddings_list:
 
                 for batch_idx, (inputs, labels) in enumerate(train_loader):
                     labels = (-1) ** labels.float()
+                   
 
                     optimizer.zero_grad()
 
@@ -108,26 +116,8 @@ for name in embeddings_list:
                 train_loss_epoch /= len(train_loader)
                 train_loss_list.append(train_loss_epoch)
 
-                # Evaluate on the test set
-                classifier.eval()
-                test_loss_epoch = 0.0
-
-                with torch.no_grad():
-                    for inputs, labels in test_loader:
-                        labels = (-1) ** labels.float()
-                        outputs = classifier(inputs)
-                        outputs = outputs.view(-1)
-                        labels = labels.view(-1)
-
-                        # Compute loss
-                        loss = loss_func(outputs, labels)
-                        test_loss_epoch += loss.item()
-
-                # Calculate average testing loss for the epoch
-                test_loss_epoch /= len(test_loader)
-                test_loss_list.append(test_loss_epoch)
-
-                print(f'Epoch [{epoch + 1}/{epochs}] completed. Train Loss: {train_loss_epoch:.4f}, Test Loss: {test_loss_epoch:.4f}')
+                
+                print(f'Epoch [{epoch + 1}/{epochs}] completed. Train Loss: {train_loss_epoch:.4f}')
 
             print('Training Finished.')
 
@@ -156,35 +146,17 @@ for name in embeddings_list:
 
                 return inputs_adv.detach()
 
-            def generate_adversarial_dataset(model, data_loader, loss_func, epsilon=0.001, percentage=0.025):
+            def generate_adversarial_dataset(model, data_loader, loss_func, epsilon=0.001):
                 model.eval()  # Set model to evaluation mode
                 adv_examples = []
                 adv_labels = []
 
-                total_samples = len(data_loader.dataset)
-                limit_samples = int(percentage * total_samples)
-                processed_samples = 0
-
+                # Iterate over the entire dataset provided by data_loader
                 for inputs, labels in data_loader:
-                    if processed_samples >= limit_samples:
-                        break  # Stop processing after reaching the limit of samples
-
-                    # Determine how many samples to process in this batch
-                    remaining_samples = limit_samples - processed_samples
-                    batch_size = inputs.size(0)
-                    if remaining_samples < batch_size:
-                        # Take only the required number of samples from this batch
-                        inputs = inputs[:remaining_samples]
-                        labels = labels[:remaining_samples]
-                        batch_size = remaining_samples  # Update batch_size for this iteration
-
-                    # Transform labels if necessary
-                    labels_adv = (-1) ** labels.float()
-                    inputs_adv = FGSM(model, inputs, labels_adv, loss_func, epsilon=epsilon)
+                    # Use true labels without any transformation
+                    inputs_adv = FGSM(model, inputs, labels, loss_func, epsilon=epsilon)
                     adv_examples.append(inputs_adv)
                     adv_labels.append(labels)
-
-                    processed_samples += batch_size
 
                 # Concatenate all adversarial examples and labels
                 adv_examples = torch.cat(adv_examples, dim=0)
@@ -192,21 +164,35 @@ for name in embeddings_list:
 
                 return adv_examples, adv_labels
 
-            # Generate adversarial datasets
+            def subset_dataloader(dataset, percentage, batch_size=batch_size, shuffle=True):
+                total_samples = len(dataset)
+                subset_size = int(percentage * total_samples)
+                
+                # Randomly select indices for the subset
+                indices = np.random.choice(total_samples, subset_size, replace=False)
+                
+                # Create a Subset using the selected indices
+                subset = Subset(dataset, indices)
+                
+                # Create a DataLoader for the subset
+                subset_loader = DataLoader(subset, batch_size=batch_size, shuffle=shuffle)
+                
+                return subset_loader
+            
+            small_train_loader = subset_dataloader(train_dataset, 0.1)
+            # Generate adversarial datasets for the entire train and test sets
             adv_train_samples, adv_train_labels = generate_adversarial_dataset(
                 model=classifier,
-                data_loader=train_loader,
+                data_loader=small_train_loader,
                 loss_func=loss_func,
-                epsilon=epsilon,
-                percentage=0.025
+                epsilon=epsilon
             )
-
+            
             adv_test_samples, adv_test_labels = generate_adversarial_dataset(
                 model=classifier,
                 data_loader=test_loader,
                 loss_func=loss_func,
-                epsilon=epsilon,
-                percentage=1
+                epsilon=epsilon
             )
 
             # Evaluate on adversarial train samples
@@ -218,7 +204,7 @@ for name in embeddings_list:
 
             with torch.no_grad():
                 for inputs, labels in adv_train_loader:
-                    labels = (-1) ** labels.float()
+                    # Use true labels (no transformation)
                     outputs = classifier(inputs)
                     outputs = outputs.view(-1)
                     labels = labels.view(-1)
@@ -229,6 +215,23 @@ for name in embeddings_list:
 
             adv_train_loss /= len(adv_train_dataset)
             print(f'Adversarial Train Loss: {adv_train_loss:.4f}')
+
+            # Evaluate on normal train samples
+            train_loss = 0.0
+
+            with torch.no_grad():
+                for inputs, labels in small_train_loader:
+                    outputs = classifier(inputs)
+                    outputs = outputs.view(-1)
+                    labels = labels.view(-1)
+
+                    # Compute loss
+                    loss = loss_func(outputs, labels)
+                    train_loss += loss.item() * inputs.size(0)
+
+            train_loss /= len(train_dataset)
+            print(f'Train Loss: {train_loss:.4f}')
+
 
             # Evaluate on adversarial test samples
             adv_test_dataset = TensorDataset(adv_test_samples, adv_test_labels)
@@ -250,8 +253,25 @@ for name in embeddings_list:
             adv_test_loss /= len(adv_test_dataset)
             print(f'Adversarial Test Loss: {adv_test_loss:.4f}')
 
+            test_loss = 0.0
+
+            with torch.no_grad():
+                for inputs, labels in test_loader:
+                    labels = (-1) ** labels.float()
+                    outputs = classifier(inputs)
+                    outputs = outputs.view(-1)
+                    labels = labels.view(-1)
+
+                    # Compute loss
+                    loss = loss_func(outputs, labels)
+                    test_loss += loss.item() * inputs.size(0)
+
+            test_loss /= len(test_dataset)
+            print(f'Test Loss: {test_loss:.4f}')
+
+
             # Compute the modulus of the difference
-            loss_difference = abs(adv_train_loss - adv_test_loss)
+            loss_difference = abs(adv_train_loss - adv_test_loss) - abs(train_loss - test_loss)
             print(f'Modulus of the Loss Difference for dimension {dimensions}: {loss_difference:.4f}')
 
             # Append the loss difference to the list for this run
