@@ -19,7 +19,7 @@ from torch.utils.data import TensorDataset, DataLoader, random_split
 # General hyperparameters
 epochs = 1
 learning_rate = 0.02
-epsilon = 0.05
+epsilon = 3.
 # Data hyperparameters
 num_samples = 2000
 train_split = 0.8
@@ -258,7 +258,7 @@ for name in embeddings_list:
             loss_differences_runs.append(loss_difference)
 
         # After 5 runs, pick the maximum loss difference for this dimension
-        max_loss_difference = max(loss_differences_runs)
+        max_loss_difference = np.mean(loss_differences_runs)
         loss_differences.append(max_loss_difference)
         print(f'Maximum Modulus of the Loss Difference for dimension {dimensions}: {max_loss_difference:.4f}')
 
