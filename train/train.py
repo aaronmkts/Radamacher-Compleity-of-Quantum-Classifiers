@@ -271,7 +271,7 @@ for name in embeddings_list:
 
 
             # Compute the modulus of the difference
-            loss_difference = abs(adv_train_loss - adv_test_loss) - abs(train_loss - test_loss)
+            loss_difference = abs(abs(adv_train_loss - adv_test_loss) - abs(train_loss - test_loss))
             print(f'Modulus of the Loss Difference for dimension {dimensions}: {loss_difference:.4f}')
 
             # Append the loss difference to the list for this run
