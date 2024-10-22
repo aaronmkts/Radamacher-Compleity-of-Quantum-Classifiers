@@ -42,6 +42,7 @@ def adv_train(classifier, train_dataset, learning_rate, batch_size, attack, epsi
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
     # Training loop
+    #bla
 
     optimizer = optim.Adam(classifier.parameters(), lr=learning_rate)
     train_loss_epoch = 1.
