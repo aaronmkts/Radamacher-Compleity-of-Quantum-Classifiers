@@ -70,7 +70,7 @@ for name in embeddings_list:
             x, y = gen_data(test_samples, dimensions)
             test_dataset = TensorDataset(x, y)
             test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-            adv_x, adv_y = generate_adversarial_dataset(trained_class, test_loader, loss_func, attack, epsilon)
+            adv_x, adv_y = generate_adversarial_dataset(trained_class, test_loader, attack, epsilon)
             adv_test_data = TensorDataset(adv_x, adv_y)
             adv_test_loader = DataLoader(adv_test_data, batch_size=batch_size, shuffle=False)
 

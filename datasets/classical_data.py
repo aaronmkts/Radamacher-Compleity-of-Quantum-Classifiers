@@ -12,7 +12,7 @@ def gen_data(m, d):
 
     for i in range (m):
         mu = np.concatenate((5*np.ones(int(d/2)),5*(-np.ones(int(d/2))) ** y[i]))
-        x[i,:]=np.random.normal(mu, 5*np.ones(d))
+        x[i,:]=np.random.normal(mu, np.ones(d))
         
     x = torch.tensor(x)
     y = torch.tensor(y) 

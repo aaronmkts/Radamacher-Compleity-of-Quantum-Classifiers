@@ -16,7 +16,7 @@ seed = 42
 np.random.seed(seed)
 torch.manual_seed(seed)
 
-def generate_adversarial_dataset(model, data_loader, loss_func, attack, epsilon):
+def generate_adversarial_dataset(model, data_loader, attack, epsilon):
     model.eval()  # Set model to evaluation mode
     adv_examples = []
     adv_labels = []
@@ -24,7 +24,7 @@ def generate_adversarial_dataset(model, data_loader, loss_func, attack, epsilon)
 
     # Iterate over the entire dataset provided by data_loader
     for inputs, labels in data_loader:
-        inputs_adv = adversary(model, inputs, labels, loss_func, epsilon)
+        inputs_adv = adversary(model, inputs, labels, epsilon)
         adv_examples.append(inputs_adv)
         adv_labels.append(labels)
 
@@ -42,7 +42,6 @@ def adv_train(classifier, train_dataset, learning_rate, batch_size, attack, epsi
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
     # Training loop
-    #bla
 
     optimizer = optim.Adam(classifier.parameters(), lr=learning_rate)
     train_loss_epoch = 1.
@@ -60,7 +59,6 @@ def adv_train(classifier, train_dataset, learning_rate, batch_size, attack, epsi
             adv_inputs, adv_labels = generate_adversarial_dataset(
                 model=classifier,
                 data_loader=train_loader,
-                loss_func=loss_func,
                 attack=attack,
                 epsilon=epsilon
             )

@@ -30,6 +30,9 @@ batch_size = 10
 #Model
 layers = 2
 
+#Adversary
+attack='FGSM'
+epsilon=0.05
 
 for name in embeddings_list:
     print(f"\nProcessing embedding: {name}")
@@ -64,10 +67,13 @@ for name in embeddings_list:
             #standard trainining
             trained_class, train_loss = train(classifier, train_dataset, epochs, learning_rate, batch_size)
 
-            #generate test data
+            #generate adversarial test data
             x, y = gen_data(test_samples, dimensions)
             test_dataset = TensorDataset(x, y)
             test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+            adv_x, adv_y = generate_adversarial_dataset(trained_class, test_loader, attack, epsilon)
+            adv_test_data = TensorDataset(adv_x, adv_y)
+            adv_test_loader = DataLoader(adv_test_data, batch_size=batch_size, shuffle=False)
 
             #Evaluate test loss
             test_loss = 0.0

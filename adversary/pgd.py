@@ -1,8 +1,9 @@
 import torch
+from train import loss_func as loss
 
 # simple implementation of projected gradient descent (PGD) attack (without randomized starting points — cf. BIM)
 # for an introduction to PGD, see https://adversarial-ml-tutorial.org/adversarial_examples/#projected-gradient-descent
-def PGD(model, feats, labels, epsilon=0.1, alpha=0.01, num_iter=10):
+def PGD(model, feats, labels, epsilon, alpha=0.01, num_iter=10):
 
     # initialize image perturbations with zero
     delta = torch.zeros_like(feats, requires_grad=True)
