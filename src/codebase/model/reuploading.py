@@ -2,9 +2,6 @@ import torch
 import pennylane as qml
 import numpy as np
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("Using device:", device)
-
 
 class Reuploading_classifier(torch.nn.Module):
     """

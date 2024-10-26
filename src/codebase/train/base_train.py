@@ -14,7 +14,6 @@ seed = 42
 np.random.seed(seed)
 torch.manual_seed(seed)
 
-
 def loss_func(expvals, labels):
     loss = torch.mean(1 / (1 + torch.exp(labels * expvals)))
     return loss

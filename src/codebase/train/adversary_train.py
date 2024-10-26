@@ -1,49 +1,25 @@
 import sys
 import os
-
-# Add the parent directory to the system path to resolve the import issue
-parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(parent_dir)
-
 import torch
 import torch.optim as optim
 import numpy as np
 from torch.utils.data import DataLoader
-from adversary import get_attack
-from train import loss_func
+from ..adversary import generate_adversarial_dataset
+
 
 seed = 42
 np.random.seed(seed)
 torch.manual_seed(seed)
 
-def generate_adversarial_dataset(model, data_loader, loss_func, attack, epsilon):
-    model.eval()  # Set model to evaluation mode
-    adv_examples = []
-    adv_labels = []
-    adversary = get_attack(attack)
+def loss_func(expvals, labels):
+    loss = torch.mean(1 / (1 + torch.exp(labels * expvals)))
+    return loss
 
-    # Iterate over the entire dataset provided by data_loader
-    for inputs, labels in data_loader:
-        inputs_adv = adversary(model, inputs, labels, loss_func, epsilon)
-        adv_examples.append(inputs_adv)
-        adv_labels.append(labels)
-
-    # Concatenate all adversarial examples and labels
-    adv_examples = torch.cat(adv_examples, dim=0)
-    adv_labels = torch.cat(adv_labels, dim=0)
-    #return model to training mode
-    model.training()
-
-    return adv_examples, adv_labels
-
-
-def adv_train(classifier, train_dataset, learning_rate, batch_size, attack, epsilon):
+def train_adversary(classifier: torch.nn.Module, train_dataset, learning_rate, batch_size, attack, epsilon):
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
     # Training loop
-    #bla
-
     optimizer = optim.Adam(classifier.parameters(), lr=learning_rate)
     train_loss_epoch = 1.
     num_epochs = 0
@@ -70,9 +46,9 @@ def adv_train(classifier, train_dataset, learning_rate, batch_size, attack, epsi
             # Forward pass with combined data
             outputs = classifier(adv_inputs)
             outputs = outputs.view(-1)
-
+  
             # Compute loss
-            loss = loss_func(outputs, labels)
+            loss = loss_func(outputs, adv_labels)
 
             # Backward pass and optimization
             loss.backward()

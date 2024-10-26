@@ -17,17 +17,3 @@ def gen_data(m, d):
     x = torch.tensor(x)
     y = torch.tensor(y) 
     return x, y
-
-"""
-x, y = gen_data(1000, 2)
-c=[]
-
-for i in y:
-    if (i==0):
-       c.append('b')
-    else:
-       c.append('g')
-
-plt.scatter(x[:, 0],x[:,1],c=c)
-plt.show()
-"""

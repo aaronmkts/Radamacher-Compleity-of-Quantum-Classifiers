@@ -2,3 +2,5 @@ scikit-learn
 pennylane
 torch
 matplotlib
+datasets
+ipdb

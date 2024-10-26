@@ -4,15 +4,8 @@ import numpy as np
 import functools
 import operator
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("Using device:", device)
 
-
-seed = 42
-np.random.seed(seed)
-torch.manual_seed(seed)
-
-class AngleEmbeddingClassifier(torch.nn.Module):
+class AmplitudeEmbeddingClassifier(torch.nn.Module):
     """
     Class for creating a quantum machine learning (classification) model
     based on the StronglyEntanglingLayers template using angle embedding
@@ -26,8 +19,7 @@ class AngleEmbeddingClassifier(torch.nn.Module):
     def __init__(self, num_qubits, num_layers):
         super().__init__()
         
-          # Fixed seed for reproducibility
-        self.num_qubits = num_qubits
+        self.num_qubits = int(num_qubits)
         self.num_layers = num_layers
 
         # Quantum device setup
@@ -41,10 +33,10 @@ class AngleEmbeddingClassifier(torch.nn.Module):
         paulis = [qml.PauliZ(i) for i in range(self.num_qubits)]
         self.observable =  functools.reduce(operator.matmul, paulis)
         # Define the quantum circuit
-        @qml.qnode(self.device)
+        @qml.qnode(self.device, diff_method="backprop")
         def circuit(inputs, weights):
-            # Angle embedding of the inputs
-            qml.AngleEmbedding(features=inputs, wires=range(self.num_qubits), rotation='Y')
+            # Amplitude embedding of the inputs
+            qml.AmplitudeEmbedding(features=inputs, wires=range(self.num_qubits), normalize=True)
             # Variational layers
             qml.BasicEntanglerLayers(weights=weights, wires=range(self.num_qubits))
             # Measurement
@@ -64,6 +56,3 @@ class AngleEmbeddingClassifier(torch.nn.Module):
     def forward(self, x):
    
         return self.qcircuit(x)
-
-
-
