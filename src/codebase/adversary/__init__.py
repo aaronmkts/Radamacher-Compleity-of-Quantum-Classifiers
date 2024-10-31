@@ -1,4 +1,4 @@
-from .l_1 import l_1
+from .l_1 import L1
 from .pgd import PGD
 from .fgsm import FGSM
 import torch
@@ -10,7 +10,7 @@ def get_attack(name: str):
         case "FGSM":
             return FGSM
         case "l_1":
-            return l_1
+            return L1
         case _:
             raise ValueError(f"Unknown attack: {name}")
         
@@ -23,7 +23,10 @@ def generate_adversarial_dataset(model: torch.nn.Module, data_loader, loss_func,
 
     # Iterate over the entire dataset provided by data_loader
     for inputs, labels in data_loader:
-        inputs_adv = adversary(model, inputs, labels, loss_func, epsilon)
+        if attack == "l_1":
+            inputs_adv = adversary(model, inputs, labels, epsilon)
+        else:
+            inputs_adv = adversary(model, inputs, labels, loss_func, epsilon)
         adv_examples.append(inputs_adv)
         adv_labels.append(labels)
 
