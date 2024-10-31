@@ -43,7 +43,7 @@ batch_size = 10
 layers = 2
 
 #Adversary
-attack='FGSM'
+attack='l_1'
 epsilon=0.05
 
 def loss_func(expvals, labels):
