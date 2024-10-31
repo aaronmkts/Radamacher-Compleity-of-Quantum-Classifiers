@@ -9,7 +9,6 @@ def L1(model, inputs, label, epsilon):
              'jac' : lambda x: -np.sign(x)})
 
     bounds = tuple((-epsilon, epsilon) for _ in inputs)
-    breakpoint()
     res = minimize(lambda x: label*model(x), x0=inputs, method='SLSQP', bounds=bounds
                             , constraints=constraints, options={'maxiter': 10})
 
