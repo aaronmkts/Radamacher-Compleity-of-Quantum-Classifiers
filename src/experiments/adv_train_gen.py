@@ -43,11 +43,11 @@ batch_size = 10
 layers = 2
 
 #Adversary
-attack='FGSM'
+attack='l_1'
 epsilon=0.05
 
-def loss_func(expvals, labels):
-    loss = torch.mean(1 / (1 + torch.exp(labels * expvals)))
+def loss_func(expvals, labels, alpha=15):
+    loss = torch.mean(1 / (1 + torch.exp(alpha*labels * expvals)))
     return loss
 
 def main():
