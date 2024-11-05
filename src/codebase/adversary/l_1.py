@@ -15,7 +15,6 @@ def l_1(model, inputs, labels, loss_func, epsilon):
 
     for i in range(len(inputs_adv)):
         bounds = tuple((-epsilon, epsilon) for y in inputs_adv.numpy()[i])
-        #print(inputs_adv.numpy()[i])
 
         res = minimize(lambda x: labels_adv.numpy()[i]*model(torch.from_numpy(x)).detach().numpy(), x0=inputs_adv.numpy()[i]
                        , method='SLSQP', bounds=bounds, constraints=constraints, options={'maxiter': 10})
