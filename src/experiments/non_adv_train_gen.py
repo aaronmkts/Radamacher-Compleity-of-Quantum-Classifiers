@@ -42,8 +42,8 @@ batch_size = 10
 #Model
 layers = 2
 
-def loss_func(expvals, labels):
-    loss = torch.mean(1 / (1 + torch.exp(labels * expvals)))
+def loss_func(expvals, labels, alpha = 15):
+    loss = torch.mean(1 / (1 + torch.exp(alpha*labels * expvals)))
     return loss
 
 

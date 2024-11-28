@@ -33,22 +33,23 @@ def train_adversary(classifier: torch.nn.Module, train_dataset, learning_rate, b
 
             optimizer.zero_grad()
 
+            labels = (-1) ** labels.float()
+
             adv_inputs, adv_labels = generate_adversarial_dataset(
                 model=classifier,
-                data_loader=train_loader,
+                inputs=inputs,
+                labels=labels,
                 loss_func=loss_func,
                 attack=attack,
                 epsilon=epsilon
             )
-
-            labels = (-1) ** labels.float()
 
             # Forward pass with combined data
             outputs = classifier(adv_inputs)
             outputs = outputs.view(-1)
   
             # Compute loss
-            loss = loss_func(outputs, adv_labels)
+            loss = loss_func(outputs, labels)
 
             # Backward pass and optimization
             loss.backward()
