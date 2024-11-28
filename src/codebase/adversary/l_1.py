@@ -1,6 +1,9 @@
 from scipy.optimize import minimize
 import numpy as np
 import torch
+from scipy.optimize import minimize
+import numpy as np
+
 
 def l_1(model, inputs, labels, loss_func, epsilon):
 
@@ -24,3 +27,4 @@ def l_1(model, inputs, labels, loss_func, epsilon):
         ret = np.array(adv_inputs)
 
     return torch.from_numpy(ret)
+
