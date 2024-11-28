@@ -1,4 +1,5 @@
 from .l_1 import L1
+from .l_2 import L2 
 from .pgd import PGD
 from .fgsm import FGSM
 import torch
@@ -11,6 +12,8 @@ def get_attack(name: str):
             return FGSM
         case "l_1":
             return L1
+        case "l_2":
+            return L2
         case _:
             raise ValueError(f"Unknown attack: {name}")
         

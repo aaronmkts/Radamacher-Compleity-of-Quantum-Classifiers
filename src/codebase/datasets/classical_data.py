@@ -6,14 +6,30 @@ seed = 42
 np.random.seed(seed)
 torch.manual_seed(seed)
 
-def gen_data(m, d):
-    x = np.zeros((m,d))
-    y = np.random.randint(0, 2, m)
+import numpy as np
+import torch
 
-    for i in range (m):
-        mu = np.concatenate((5*np.ones(int(d/2)),5*(-np.ones(int(d/2))) ** y[i]))
-        x[i,:]=np.random.normal(mu, 5*np.ones(d))
+pi = np.pi
+
+def gen_data(num_samples, dimensions):
+
+    # Initialize data and labels
+    x = np.zeros((num_samples, dimensions))
+    y = np.random.randint(0, 2, num_samples)  # Random labels {0, 1}
+
+    for i in range(num_samples):
+        # Define the mean for each class
+        mu = pi*np.concatenate((np.ones(int(dimensions//2)),
+                                    (-np.ones(int(dimensions - dimensions//2))) ** y[i]))/4
         
-    x = torch.tensor(x)
-    y = torch.tensor(y) 
+        # Covariance is identity matrix
+        cov = 0.1 * np.eye(dimensions)
+        
+        # Generate data point
+        x[i, :] = np.random.multivariate_normal(mu, cov)
+
+    # Convert to torch tensors
+    x = torch.tensor(x, dtype=torch.float32)
+    y = torch.tensor(y, dtype=torch.int64)
+    
     return x, y
