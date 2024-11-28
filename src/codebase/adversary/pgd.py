@@ -1,4 +1,5 @@
 import torch
+from train import loss_func as loss
 
 # simple implementation of projected gradient descent (PGD) attack (without randomized starting points — cf. BIM)
 # for an introduction to PGD, see https://adversarial-ml-tutorial.org/adversarial_examples/#projected-gradient-descent
