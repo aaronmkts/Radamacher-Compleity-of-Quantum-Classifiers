@@ -27,14 +27,6 @@ def generate_adversarial_dataset(model: torch.nn.Module, inputs, labels, loss_fu
 
     inputs_adv = adversary(model, inputs, labels, loss_func, epsilon)
 
-    for inputs, labels in data_loader:
-        if attack == "l_1":
-            inputs_adv = adversary(model, inputs, labels, epsilon)
-        else:
-            inputs_adv = adversary(model, inputs, labels, loss_func, epsilon)
-        adv_examples.append(inputs_adv)
-        adv_labels.append(labels)
-
     model.train()
 
     return inputs_adv, labels

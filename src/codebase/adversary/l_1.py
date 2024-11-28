@@ -5,7 +5,7 @@ from scipy.optimize import minimize
 import numpy as np
 
 
-def l_1(model, inputs, labels, loss_func, epsilon):
+def L1(model, inputs, labels, loss_func, epsilon):
 
     inputs_adv = inputs.clone().detach().requires_grad_(False).numpy()
     labels_adv = labels.clone().detach().numpy()
