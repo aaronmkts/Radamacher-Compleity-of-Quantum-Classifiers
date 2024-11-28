@@ -2,7 +2,7 @@ from .l_1 import L1
 from .l_2 import L2 
 from .pgd import PGD
 from .fgsm import FGSM
-from .l_2 import l_2
+from .l_2 import L2
 import torch
 
 def get_attack(name: str):

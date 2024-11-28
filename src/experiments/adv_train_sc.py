@@ -11,6 +11,7 @@ sys.path.append(
 #from codebase.datasets import gen_data
 from codebase.train import train
 from codebase.model import get_classifier
+from codebase.adversary import get_attack
 
 #Default Imports
 import numpy as np
@@ -27,10 +28,6 @@ seed = 42
 np.random.seed(seed)
 torch.manual_seed(seed)
 
-# Set random seed for reproducibility
-seed = 42
-np.random.seed(seed)
-torch.manual_seed(seed)
 
 # Custom loss function
 def loss_func(expvals, labels):
@@ -53,9 +50,9 @@ class QuantumClassifier(nn.Module):
         @qml.qnode(self.device, interface="torch", diff_method="backprop")
         def quantum_circuit(inputs, weights):
             # Apply angle embedding
-            #for i in range(self.num_qubits):
-                #qml.RY(inputs[i], wires=i)
-            qml.AmplitudeEmbedding(features=inputs, wires=range(self.num_qubits), normalize=True)
+            for i in range(self.num_qubits):
+                qml.RY(inputs[i], wires=i)
+            #qml.AmplitudeEmbedding(features=inputs, wires=range(self.num_qubits), normalize=True)
             # Apply variational layers
             qml.templates.StronglyEntanglingLayers(weights, wires=range(self.num_qubits))
             
@@ -98,9 +95,10 @@ def gen_data(num_samples, dimensions):
     
     return x, y
 # Training function
-def train_model(classifier, train_loader, test_loader, epochs, learning_rate, device):
+def train_adv_model(classifier, train_loader, test_loader, epochs, learning_rate, device, attacker, epsilon):
     optimizer = optim.Adam(classifier.parameters(), lr=learning_rate)
 
+    attacker_cls = get_attack(attacker)
     train_losses = []
     test_accuracies = []
 
@@ -112,8 +110,11 @@ def train_model(classifier, train_loader, test_loader, epochs, learning_rate, de
             inputs, labels = inputs.to(device), labels.to(device)
             labels = torch.where(labels == 0, 1, -1).float()  # Map labels {0, 1} -> {1, -1}
 
+            # Generate adversarial examples
+            inputs_adv = attacker_cls(classifier, inputs, labels, loss_func, epsilon)
+
             optimizer.zero_grad()
-            outputs = classifier(inputs).view(-1)
+            outputs = classifier(inputs_adv).view(-1)
 
             # Compute custom loss
             loss = loss_func(outputs, labels)
@@ -126,7 +127,7 @@ def train_model(classifier, train_loader, test_loader, epochs, learning_rate, de
         train_losses.append(train_loss_epoch)
 
         # Evaluate accuracy on the test set
-        test_accuracy = evaluate_model(classifier, test_loader, device)
+        test_accuracy = evaluate_model(classifier, test_loader, device, epsilon, attacker)
         test_accuracies.append(test_accuracy)
 
         print(f"Epoch [{epoch + 1}/{epochs}] - Loss: {train_loss_epoch:.4f}, Test Accuracy: {test_accuracy:.2f}%")
@@ -134,20 +135,24 @@ def train_model(classifier, train_loader, test_loader, epochs, learning_rate, de
     return train_losses, test_accuracies
 
 # Evaluation function
-def evaluate_model(classifier, test_loader, device):
+def evaluate_model(classifier, test_loader, device, epsilon, attacker):
     classifier.eval()
     correct = 0
     total = 0
 
-    with torch.no_grad():
-        for inputs, labels in test_loader:
-            inputs, labels = inputs.to(device), labels.to(device)
-            outputs = classifier(inputs).view(-1)
+    attacker_cls = get_attack(attacker)
+    for inputs, labels in test_loader:
+        inputs, labels = inputs.to(device), labels.to(device)
 
-            predictions = torch.sign(outputs)  # Convert outputs to binary predictions
-            labels = torch.where(labels == 0, 1, -1).float()
-            correct += (predictions == labels).sum().item()
-            total += labels.size(0)
+        
+        inputs_adv = attacker_cls(classifier, inputs, labels, loss_func, epsilon)
+
+        outputs = classifier(inputs_adv).view(-1).detach()
+
+        predictions = torch.sign(outputs)  # Convert outputs to binary predictions
+        labels = torch.where(labels == 0, 1, -1).float()
+        correct += (predictions == labels).sum().item()
+        total += labels.size(0)
 
     accuracy = 100 * correct / total
     return accuracy
@@ -185,8 +190,10 @@ def main():
     dimension = 4  # Separation between Gaussian peaks
     epochs = 35
     learning_rate = 0.01
-    num_qubits = 2  # Data is 2D
+    num_qubits = 4  # Data is 2D
     num_layers = 2
+    attacker = "l_2"
+    epsilon = 0.05
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Generate data
@@ -202,7 +209,9 @@ def main():
     classifier = QuantumClassifier(num_qubits=num_qubits, num_layers=num_layers)
 
     # Train the model
-    train_losses, test_accuracies = train_model(classifier, train_loader, test_loader, epochs, learning_rate, device)
+    train_losses, test_accuracies = train_adv_model(classifier, train_loader, test_loader, 
+                                                    epochs, learning_rate, device,
+                                                    attacker, epsilon)
 
     # Plot results
     plot_results(train_losses, test_accuracies)
