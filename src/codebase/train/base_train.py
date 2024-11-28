@@ -25,6 +25,8 @@ def train(classifier, train_dataset, epochs, learning_rate, batch_size):
     # Training loop
     optimizer = optim.Adam(classifier.parameters(), lr=learning_rate)
 
+    loss_per_epoch = []
+
     for epoch in range(epochs):
         classifier.train()  # Set model to training mode
         train_loss_epoch = 0.0
@@ -50,9 +52,10 @@ def train(classifier, train_dataset, epochs, learning_rate, batch_size):
 
         # Calculate average training loss for the epoch
         train_loss_epoch /= len(train_loader)
+        loss_per_epoch.append(train_loss_epoch)
 
         print(f'Epoch [{epoch + 1}/{epochs}] completed. Train Loss: {train_loss_epoch:.4f}')
 
     print('Training Finished.')
 
-    return classifier, train_loss_epoch
+    return classifier, np.array(loss_per_epoch)
