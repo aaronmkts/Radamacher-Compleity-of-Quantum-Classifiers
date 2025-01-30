@@ -1,7 +1,6 @@
 import torch
-from train import loss_func
 
-def FGSM(model, inputs, labels, epsilon):
+def FGSM(model, inputs, labels, loss_func, epsilon):
     # Ensure inputs require gradients
     inputs_adv = inputs.clone().detach().requires_grad_(True)
     labels_adv = labels.clone().detach()
