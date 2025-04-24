@@ -35,6 +35,10 @@ def loss_func(expvals, labels, alpha=10):
     loss = torch.mean(1 / (1 + torch.exp(alpha * labels * expvals)))
     return loss
 
+def l(expvals, labels, alpha=10):
+    loss = (1 / (1 + torch.exp(alpha * labels * expvals)))
+    return loss
+
 
 # Simple classifier model
 class QuantumAngleClassifier(nn.Module):
@@ -59,7 +63,7 @@ class QuantumAngleClassifier(nn.Module):
             qml.templates.StronglyEntanglingLayers(weights, wires=range(self.num_qubits))
 
             # Measure expectation of Z on the first qubit
-            return qml.expval(qml.PauliZ(num_qubits // 2))
+            return qml.expval(self.observable)
 
         self.quantum_circuit = quantum_circuit
 
@@ -97,7 +101,7 @@ class QuantumAmplClassifier(nn.Module):
             qml.templates.StronglyEntanglingLayers(weights, wires=range(self.num_qubits))
 
             # Measure expectation of Z on the first qubit
-            return qml.expval(qml.PauliZ(num_qubits // 2))
+            return qml.expval(self.observable)
 
         self.quantum_circuit = quantum_circuit
 
@@ -127,7 +131,7 @@ def gen_data(num_samples, dimensions):
                                      (-np.ones(int(dimensions - dimensions // 2))) ** y[i])) / 4
 
         # Covariance is identity matrix
-        cov = np.pi * np.eye(dimensions)/4
+        cov = np.pi * np.eye(dimensions)/8
 
         # Generate data point
         x[i, :] = np.random.multivariate_normal(mu, cov)
@@ -172,7 +176,8 @@ def train_adv_model(classifier, train_loader, test_loader, epochs, learning_rate
         train_loss_epoch /= len(train_loader)
         train_losses.append(train_loss_epoch)
 
-        print(f"Epoch [{epoch + 1}/{epochs}] - Loss: {train_loss_epoch:.4f}")
+        if epoch == epochs-1:
+            print(f"Loss: {train_loss_epoch:.4f}")
 
     classifier.eval()
 
@@ -181,8 +186,9 @@ def train_adv_model(classifier, train_loader, test_loader, epochs, learning_rate
     adv_train_loss = 0.
     for inputs, labels in train_loader:
         inputs, labels = inputs.to(device), labels.to(device)
-        inputs_adv = attacker_cls(classifier, inputs, labels, loss_func, epsilon)
         labels = torch.where(labels == 0, 1, -1).float()  # Map labels {0, 1} -> {1, -1}
+        inputs_adv = attacker_cls(classifier, inputs, labels, loss_func, epsilon)
+
 
         #
         outputs = classifier(inputs).view(-1)
@@ -203,12 +209,12 @@ def train_adv_model(classifier, train_loader, test_loader, epochs, learning_rate
 
     for inputs, labels in test_loader:
         inputs, labels = inputs.to(device), labels.to(device)
-
+        labels = torch.where(labels == 0, 1, -1).float()
         inputs_adv = attacker_cls(classifier, inputs, labels, loss_func, epsilon)
 
         outputs_adv = classifier(inputs_adv).view(-1).detach()
         outputs = classifier(inputs).view(-1).detach()
-        labels = torch.where(labels == 0, 1, -1).float()
+
 
         # Compute custom loss
         loss = loss_func(outputs, labels)
@@ -263,8 +269,9 @@ def train_model(classifier, train_loader, test_loader, threshold, learning_rate,
     adv_train_loss = 0.
     for inputs, labels in train_loader:
         inputs, labels = inputs.to(device), labels.to(device)
-        inputs_adv = attacker_cls(classifier, inputs, labels, loss_func, epsilon)
         labels = torch.where(labels == 0, 1, -1).float()  # Map labels {0, 1} -> {1, -1}
+        inputs_adv = attacker_cls(classifier, inputs, labels, loss_func, epsilon)
+
 
         #
         outputs = classifier(inputs).view(-1)
@@ -285,12 +292,12 @@ def train_model(classifier, train_loader, test_loader, threshold, learning_rate,
 
     for inputs, labels in test_loader:
         inputs, labels = inputs.to(device), labels.to(device)
-
+        labels = torch.where(labels == 0, 1, -1).float()
         inputs_adv = attacker_cls(classifier, inputs, labels, loss_func, epsilon)
 
         outputs_adv = classifier(inputs_adv).view(-1).detach()
         outputs = classifier(inputs).view(-1).detach()
-        labels = torch.where(labels == 0, 1, -1).float()
+
 
         # Compute custom loss
         loss = loss_func(outputs, labels)
@@ -314,11 +321,11 @@ def evaluate_model(classifier, test_loader, device, epsilon, attacker):
     attacker_cls = get_attack(attacker)
     for inputs, labels in test_loader:
         inputs, labels = inputs.to(device), labels.to(device)
-
+        labels = torch.where(labels == 0, 1, -1).float()
         inputs_adv = attacker_cls(classifier, inputs, labels, loss_func, epsilon)
 
         outputs = classifier(inputs_adv).view(-1).detach()
-        labels = torch.where(labels == 0, 1, -1).float()
+
         adv_losses.append(torch.sum(loss_func(outputs, labels)))
 
     for inputs, labels in test_loader:
@@ -330,55 +337,125 @@ def evaluate_model(classifier, test_loader, device, epsilon, attacker):
 
     return np.sum(adv_losses) / 1000., np.sum(adv_losses) / 1000.
 
+def epoch_eval(classifier, train_loader, test_loader, epochs, learning_rate, device, attacker, epsilon):
+    optimizer = optim.Adam(classifier.parameters(), lr=learning_rate)
+
+    attacker_cls = get_attack(attacker)
+    train_accuracies = []
+    adv_train_accuracies = []
+    test_accuracies = []
+    adv_test_accuracies = []
+
+    for epoch in range(epochs):
+        print(f"Epoch: {(epoch+1)}/{epochs}")
+
+        train_loss_epoch = 0.0
+        sum_adv = 0.
+        sum = 0.
+
+        classifier.eval()
+        for inputs, labels in test_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            labels = torch.where(labels == 0, 1, -1).float()  # Map labels {0, 1} -> {1, -1}
+
+            # Generate adversarial examples
+            inputs_adv = attacker_cls(classifier, inputs, labels, loss_func, epsilon)
+            outputs_adv = classifier(inputs_adv).view(-1)
+            preds_adv = torch.sign(outputs_adv)
+            outputs = classifier(inputs).view(-1)
+            preds = torch.sign(outputs)
+
+            sum_adv += torch.sum(l(outputs_adv, labels))
+            sum += torch.sum(l(outputs, labels))
+
+        test_accuracies.append(sum / 200)
+        adv_test_accuracies.append(sum_adv/200)
+
+        classifier.train()
+        sum = 0.
+        sum_adv = 0.
+        # training
+        for inputs, labels in train_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            labels = torch.where(labels == 0, 1, -1).float()  # Map labels {0, 1} -> {1, -1}
+
+            # Generate adversarial examples
+            inputs_adv = attacker_cls(classifier, inputs, labels, loss_func, epsilon)
+
+            optimizer.zero_grad()
+            outputs_adv = classifier(inputs_adv).view(-1)
+            preds_adv = torch.sign(outputs_adv)
+
+            outputs = classifier(inputs).view(-1)
+            preds = torch.sign(outputs)
+
+            sum_adv += torch.sum(l(outputs_adv, labels))
+            sum += torch.sum(l(outputs, labels))
+
+            # Compute custom loss
+            loss = loss_func(outputs_adv, labels)
+            loss.backward()
+            optimizer.step()
+
+            train_loss_epoch += loss.item()
+
+        train_loss_epoch /= len(train_loader)
+        train_accuracies.append(sum/20)
+        adv_train_accuracies.append(sum_adv / 20)
+
+    classifier.eval()
+
+
+    return torch.tensor(train_accuracies).detach().numpy(), torch.tensor(test_accuracies).detach().numpy(),torch.tensor(adv_train_accuracies).detach().numpy(), torch.tensor(adv_test_accuracies).detach().numpy()
+
 
 
 # Main function
 def main():
     # Parameters
-    #num_train_samples = 10
-    num_test_samples = 1000
+    num_train_samples = 20
+    num_test_samples = 200
     batch_size = 10
-    epochs = 30
-    learning_rate = 0.01
+    epochs = 20
+    learning_rate = 0.1
     num_layers = 4
     attacker = "l_2"
-    epsilon = 0.4
+    epsilon = 0.3
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     runs = 20
     threshold=0.3
-    dimensions = 2
-
+    """
     # control variables
-    #dimensions_list = [2, 4, 6, 8, 10, 12, 14, 16]
-    #deez = len(dimensions_list)
+    dimensions_list = [2, 4, 6, 8, 10, 12, 14, 16]
+    deez = len(dimensions_list)
 
-    training_data_list = np.linspace(10, 101, 10, dtype=int)
-    deez = len(training_data_list)
+    #training_data_list = np.array(10+np.linspace(0, 45, 10), dtype=int)
+    #teez = len(training_data_list)
     embeddings_list = ['angle', 'amplitude']
 
     angle = np.zeros((runs, deez, 4))
     ampl = np.zeros((runs, deez, 4))
 
+    for dimensions in dimensions_list:
+        print(f"\nProcessing dimension: {dimensions}")
 
-    for num_train_samples in training_data_list:
-        print(f"\nProcessing number of data: {num_train_samples}")
-
-        # List to store loss differences for multiple runs
-        loss_differences_runs = []
         x = np.zeros((runs, num_train_samples, dimensions))
         y = np.zeros((runs, num_train_samples))
         for run in range(runs):
             # Generate data
-            x_train, y_train = gen_data(num_train_samples, dimensions)
-            x[run] = x_train
-            y[run] = y_train
+            print(f"Run {run + 1}/{runs}")
+            #x_train, y_train = gen_data(num_train_samples, dimensions)
+            x = np.load(f'x_r=30_d={dimensions}_m=20.npy')
+            x_train = torch.tensor(x[run], dtype=torch.float32)
+            y = np.load(f'y_r=30_d={dimensions}_m=20.npy')
+            y_train = torch.tensor(y[run], dtype=torch.float64)
+            #x[run] = x_train
+            #y[run] = y_train
 
             x_test, y_test = gen_data(num_test_samples, dimensions)
 
             for name in embeddings_list:
                 print(f"\nProcessing embedding: {name}")
-
-                print(f"Run {run + 1}/{runs}")
 
                 train_dataset = TensorDataset(x_train, y_train)
                 test_dataset = TensorDataset(x_test, y_test)
@@ -392,14 +469,14 @@ def main():
                     num_qubits = int(np.ceil(np.log2(dimensions)))
                     classifier = QuantumAmplClassifier(num_qubits=num_qubits, num_layers=num_layers)
 
-                """
+                
                 # Training
-                adv_train, train, adv_test, test = train_model(classifier, train_loader, test_loader,
+                #adv_train, train, adv_test, test = train_model(classifier, train_loader, test_loader,
                                                         threshold, learning_rate, device,
                                                         attacker, epsilon)
 
                 # Adversarial Training
-                """
+                
                 adv_train, train, adv_test, test = train_adv_model(classifier, train_loader, test_loader,
                                                                epochs, learning_rate, device,
                                                                attacker, epsilon)
@@ -407,21 +484,23 @@ def main():
 
                 losses = np.array([adv_train, train, adv_test, test])
 
-                i = int(num_train_samples//10-1)
-                #i = int(np.log2(dimensions)-1)
+                #ts = int((num_train_samples-10)//5)
+                ds = int(dimensions//2-1)
+
                 if name == 'angle':
-                    angle[run][i] = losses
+                    angle[run][ds] = losses
                 else:
-                    ampl[run][i] = losses
+                    ampl[run][ds] = losses
 
-        #np.save(f"x_{dimensions}", x)
-        #np.save(f"y_{dimensions}", y)
+        #np.save(f"x_r=30_d={dimensions}_m=20", x)
+        #np.save(f"y_r=30_d={dimensions}_m=20", y)
 
 
-    np.save("angle_losses_num", angle)
-    np.save("ampl_losses_num", ampl)
+    np.save("l_2_angle_losses_dim_r=30_m=20_e=40", angle)
+    np.save("l_2ampl_losses_dim_r=30_m=20_e=40", ampl)
+    """
 
-"""
+    """
     # Generate data
     x_train, y_train = gen_data(num_train_samples, dimension)
     x_test, y_test = gen_data(num_test_samples, dimension)
@@ -441,7 +520,38 @@ def main():
 
     # Plot results
     plot_results(train_losses, test_accuracies)
-"""
+    """
+    dimensions = 4
+    epsilon = 0.3
+    classifier = QuantumAngleClassifier(dimensions, 4)
+
+    attacker = 'FGSM'
+    x = np.load(f'x_r=30_d={dimensions}_m=20.npy')
+    y = np.load(f'y_r=30_d={dimensions}_m=20.npy')
+
+    train_accuracies = np.zeros((20, 20))
+    test_accuracies = np.zeros((20, 20))
+    adv_train_accuracies = np.zeros((20, 20))
+    adv_test_accuracies = np.zeros((20, 20))
+
+    for i in range(20):
+        x_train = torch.tensor(x[i])
+        y_train = torch.tensor(y[i])
+
+        x_test, y_test = gen_data(num_test_samples, dimensions)
+
+        train_dataset = TensorDataset(x_train, y_train)
+        test_dataset = TensorDataset(x_test, y_test)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+        train_accuracies[i], test_accuracies[i], adv_train_accuracies[i], adv_test_accuracies[i] = epoch_eval(classifier, train_loader, test_loader, epochs, learning_rate, device, attacker, epsilon)
+
+    np.save("train_loss", train_accuracies)
+    np.save("test_loss", test_accuracies)
+    np.save("adv_train_loss", adv_train_accuracies)
+    np.save("adv_test_loss", adv_test_accuracies)
+
 
 if __name__ == '__main__':
     main()

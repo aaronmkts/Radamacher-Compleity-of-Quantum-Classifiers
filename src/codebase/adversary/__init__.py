@@ -3,6 +3,9 @@ from .l_2 import L2
 from .pgd import PGD
 from .fgsm import FGSM
 from .l_2 import L2
+from .quantum import quantum_attack as quantum
+from .quantum_FGSM import quantum_attack as Quantum_FGSM
+from .QFGSM import quantum_attack as QFGSM
 import torch
 
 def get_attack(name: str):
@@ -15,6 +18,10 @@ def get_attack(name: str):
             return L1
         case "l_2":
             return L2
+        case "quantum":
+            return quantum
+        case "QFGSM":
+            return QFGSM
         case _:
             raise ValueError(f"Unknown attack: {name}")
         
