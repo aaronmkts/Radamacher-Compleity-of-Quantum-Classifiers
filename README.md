@@ -1,2 +1,2 @@
-# Radamacher Compleity of Quantum Classifiers
+# Radamacher Complexity of Quantum Classifiers
  
