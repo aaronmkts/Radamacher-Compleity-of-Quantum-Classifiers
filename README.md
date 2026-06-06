@@ -35,8 +35,12 @@ The repository is primarily a research-code release. It is intended to make the 
 ├── LICENSE
 ├── requirements.txt
 ├── environment.yml
+├── pyproject.toml
+├── CITATION.cff
 ├── docs/
-│   └── INSPECTION_READINESS_PLAN.md
+│   ├── ARTEFACTS.md
+│   ├── INSPECTION_READINESS_PLAN.md
+│   └── SMOKE_TESTS.md
 └── src/
     ├── codebase/
     │   ├── adversary/      # Adversarial attacks for classical and quantum settings
@@ -101,19 +105,10 @@ pip install -r requirements.txt
 
 Notes:
 
-- `requirements.txt` contains the main runtime dependencies: `scikit-learn`, `pennylane`, `torch`, `matplotlib`, `datasets`, and `ipdb`.
-- Some adversary/quantum experiment paths additionally import `scipy` and `numdifftools`. Install them before running the full experiment suite or the adversary import smoke test:
-
-```bash
-pip install scipy numdifftools
-```
-
-- The checked-in `environment.yml` records a local development environment and does not install the full Python dependency set by itself. For a fresh setup, prefer the `pip install -r requirements.txt` route above, then install the extra packages above if you need the quantum adversary paths.
-- For optional formatting/lint-style inspection, install Black:
-
-```bash
-pip install black
-```
+- `requirements.txt` contains the runtime and inspection dependencies: `scikit-learn`, `pennylane`, `torch`, `matplotlib`, `datasets`, `ipdb`, `scipy`, `numdifftools`, and `black`.
+- `scipy` and `numdifftools` are required by the quantum/adversary paths.
+- `black` is included for formatting and lint-style inspection.
+- The checked-in `environment.yml` records a local development environment. For a fresh setup, prefer the `pip install -r requirements.txt` route above.
 
 ---
 
@@ -164,13 +159,17 @@ Exact function/class formatting may differ across Python versions.
 
 ### Formatting/lint-style inspection with Black
 
-This repository currently preserves the original research-code formatting. To inspect formatting without changing source files, run Black in check mode:
+This repository is formatted with [Black](https://black.readthedocs.io/) using the configuration in `pyproject.toml`. To verify formatting without modifying files, run:
 
 ```bash
 black --check src
 ```
 
-If Black reports files that would be reformatted, treat that as cosmetic information. Do not run `black src` as part of an inspection-only pass unless a source-formatting branch has been explicitly approved, because it will modify Python files even though it should not change execution semantics.
+To reapply formatting after source edits, run:
+
+```bash
+black src
+```
 
 ---
 
@@ -383,10 +382,10 @@ pip install -r requirements.txt
 
 ### `ModuleNotFoundError: No module named 'scipy'` or `No module named 'numdifftools'`
 
-Some quantum-state and adversary paths use SciPy and Numdifftools. Install them manually:
+These packages are listed in `requirements.txt`. Reinstall the repository dependencies:
 
 ```bash
-pip install scipy numdifftools
+pip install -r requirements.txt
 ```
 
 ### `FileNotFoundError: *.npy`
@@ -413,10 +412,12 @@ For external inspection of the current repository:
 4. Keep generated artefacts separate from source code unless an explicit artefact release is prepared.
 5. Record any environment/version changes when reporting reproduced results.
 
-A cosmetic/documentation-only readiness plan is available at:
+A cosmetic/documentation-only readiness plan and supporting inspection notes are available at:
 
 ```text
 docs/INSPECTION_READINESS_PLAN.md
+docs/SMOKE_TESTS.md
+docs/ARTEFACTS.md
 ```
 
 ---

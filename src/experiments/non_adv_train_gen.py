@@ -4,7 +4,8 @@ import os
 os.environ["PYTHONBREAKPOINT"] = "ipdb.set_trace"
 sys.path.append(
     os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "..",
+        os.path.dirname(os.path.realpath(__file__)),
+        "..",
     )
 )
 
@@ -12,49 +13,49 @@ from codebase.datasets import gen_data
 from codebase.train import train
 from codebase.model import get_classifier
 
-#Default Imports
+# Default Imports
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 
-#seed for reproducibility
+# seed for reproducibility
 seed = 42
 np.random.seed(seed)
 torch.manual_seed(seed)
 
 ############# HYPERPARAMETERS #############
 
-#control variables
+# control variables
 dimensions_list = [2, 4, 8, 16]
-embeddings_list = ['angle', 'amplitude']
-loss_differences_dict = {'angle': [], 'amplitude': []}
+embeddings_list = ["angle", "amplitude"]
+loss_differences_dict = {"angle": [], "amplitude": []}
 
-#General
+# General
 learning_rate = 0.02
 epochs = 5
 
-#Data
+# Data
 train_samples = 500
 test_samples = 2000
 batch_size = 10
 
-#Model
+# Model
 layers = 2
 
-def loss_func(expvals, labels, alpha = 15):
-    loss = torch.mean(1 / (1 + torch.exp(alpha*labels * expvals)))
+
+def loss_func(expvals, labels, alpha=15):
+    loss = torch.mean(1 / (1 + torch.exp(alpha * labels * expvals)))
     return loss
 
 
 def main():
-    
-   
+
     for name in embeddings_list:
         print(f"\nProcessing embedding: {name}")
         loss_differences = []
 
-        runs = 5 if name == 'angle' else 20 #Do more uns for amplitude embedding
+        runs = 5 if name == "angle" else 20  # Do more uns for amplitude embedding
 
         for dimensions in dimensions_list:
             print(f"\nProcessing dimension: {dimensions}")
@@ -69,24 +70,28 @@ def main():
                 x, y = gen_data(train_samples, dimensions)
                 train_dataset = TensorDataset(x, y)
 
-                if name == 'angle':
+                if name == "angle":
                     num_qubits = dimensions
                 else:
                     num_qubits = int(np.ceil(np.log2(dimensions)))
 
-                #instantiate classifier to be trained
+                # instantiate classifier to be trained
                 classifier_fn = get_classifier(name)
                 classifier = classifier_fn(num_qubits=num_qubits, num_layers=layers)
 
-                #standard trainining
-                trained_class, train_loss = train(classifier, train_dataset, epochs, learning_rate, batch_size)
+                # standard trainining
+                trained_class, train_loss = train(
+                    classifier, train_dataset, epochs, learning_rate, batch_size
+                )
 
-                #generate test data
+                # generate test data
                 x, y = gen_data(test_samples, dimensions)
                 test_dataset = TensorDataset(x, y)
-                test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+                test_loader = DataLoader(
+                    test_dataset, batch_size=batch_size, shuffle=False
+                )
 
-                #Evaluate test loss
+                # Evaluate test loss
                 test_loss = 0.0
                 with torch.no_grad():
                     for inputs, labels in test_loader:
@@ -101,26 +106,26 @@ def main():
 
                 test_loss /= len(test_dataset)
 
-                #mod of test - train loss
-                loss_differences_runs.append(test_loss-train_loss)
+                # mod of test - train loss
+                loss_differences_runs.append(test_loss - train_loss)
 
-            #max of loss differences over runs indicates worst case generalization
+            # max of loss differences over runs indicates worst case generalization
             loss_differences.append(np.max(loss_differences_runs))
 
         # After processing all dimensions for this embedding, store the loss_differences
         loss_differences_dict[name] = loss_differences
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
     # Plot the modulus of the loss differences against dimensions for both embeddings
     plt.figure()
     for name in embeddings_list:
-        plt.plot(dimensions_list, loss_differences_dict[name], marker='o', label=name)
+        plt.plot(dimensions_list, loss_differences_dict[name], marker="o", label=name)
 
-    plt.xlabel('Dimensions (d)')
-    plt.ylabel('Test Loss (Max over 5 runs)')
-    plt.title('Max Modulus of Loss Difference vs Dimensions')
+    plt.xlabel("Dimensions (d)")
+    plt.ylabel("Test Loss (Max over 5 runs)")
+    plt.title("Max Modulus of Loss Difference vs Dimensions")
     plt.grid(True)
     plt.legend()
     plt.show()

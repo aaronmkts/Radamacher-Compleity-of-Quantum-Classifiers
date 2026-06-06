@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the accompanying paper."
+title: "On the Generalization of Adversarially Trained Quantum Classifiers"
+authors:
+  - family-names: Georgiou
+    given-names: Petros
+  - family-names: Thomas
+    given-names: Aaron Mark
+  - family-names: Jose
+    given-names: Sharu Theresa
+  - family-names: Simeone
+    given-names: Osvaldo
+year: 2025
+license: MIT
+repository-code: "https://github.com/aaronmkts/Radamacher-Compleity-of-Quantum-Classifiers"
+url: "https://arxiv.org/abs/2504.17690"
+abstract: "Research code accompanying the paper On the Generalization of Adversarially Trained Quantum Classifiers."
+preferred-citation:
+  type: article
+  title: "On the Generalization of Adversarially Trained Quantum Classifiers"
+  authors:
+    - family-names: Georgiou
+      given-names: Petros
+    - family-names: Thomas
+      given-names: Aaron Mark
+    - family-names: Jose
+      given-names: Sharu Theresa
+    - family-names: Simeone
+      given-names: Osvaldo
+  year: 2025
+  archive: arXiv
+  identifiers:
+    - type: other
+      value: "arXiv:2504.17690"
+  url: "https://arxiv.org/abs/2504.17690"

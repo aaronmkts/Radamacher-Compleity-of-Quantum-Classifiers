@@ -5,7 +5,9 @@ import functools
 import operator
 
 import os
+
 os.environ["OMP_MAX_ACTIVE_LEVELS"] = "1"
+
 
 class AngleEmbeddingClassifier(torch.nn.Module):
     """
@@ -18,10 +20,11 @@ class AngleEmbeddingClassifier(torch.nn.Module):
         num_qubits (int): Number of qubits in the circuit.
         num_layers (int): Number of layers within the StronglyEntanglingLayers template.
     """
+
     def __init__(self, num_qubits, num_layers):
         super().__init__()
-        
-          # Fixed seed for reproducibility
+
+        # Fixed seed for reproducibility
         self.num_qubits = num_qubits
         self.num_layers = num_layers
 
@@ -34,12 +37,15 @@ class AngleEmbeddingClassifier(torch.nn.Module):
         )
 
         paulis = [qml.PauliZ(i) for i in range(self.num_qubits)]
-        self.observable =  functools.reduce(operator.matmul, paulis)
+        self.observable = functools.reduce(operator.matmul, paulis)
+
         # Define the quantum circuit
         @qml.qnode(self.device)
         def circuit(inputs, weights):
             # Angle embedding of the inputs
-            qml.AngleEmbedding(features=inputs, wires=range(self.num_qubits), rotation='Y')
+            qml.AngleEmbedding(
+                features=inputs, wires=range(self.num_qubits), rotation="Y"
+            )
             # Variational layers
             qml.BasicEntanglerLayers(weights=weights, wires=range(self.num_qubits))
             # Measurement
@@ -51,14 +57,9 @@ class AngleEmbeddingClassifier(torch.nn.Module):
 
         # Create the quantum circuit as a TorchLayer
         self.qcircuit = qml.qnn.TorchLayer(
-            qnode=circuit,
-            weight_shapes=param_shapes,
-            init_method=init_vals
+            qnode=circuit, weight_shapes=param_shapes, init_method=init_vals
         )
 
     def forward(self, x):
-   
+
         return self.qcircuit(x)
-
-
-

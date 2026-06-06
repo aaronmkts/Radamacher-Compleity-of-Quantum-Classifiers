@@ -43,10 +43,10 @@ These are deliberately out of scope for the current pass:
 4. Changing default hyperparameters.
 5. Changing random seeds.
 6. Replacing `sys.path.append(...)` import handling.
-7. Reformatting code with Black/Ruff if it could create large non-semantic diffs.
-8. Re-generating paper figures or committing generated `.npy`/plot artefacts.
-9. Modifying model, training, loss, or adversarial attack behaviour.
-10. Applying Black formatting to source files during this pass. Use `black --check src` for inspection only unless a separate source-formatting branch is explicitly authorised.
+7. Re-generating paper figures or committing generated `.npy`/plot artefacts.
+8. Modifying model, training, loss, or adversarial attack behaviour.
+
+A Black formatting pass was explicitly authorised after the original documentation-only pass. The formatting change is cosmetic and should not alter execution semantics.
 
 External inspection readiness here means: *a reader can understand and run the existing code*, not that the code is redesigned into a packaged library.
 
@@ -146,19 +146,20 @@ PY
 
 **Risk:** Documentation only.
 
-### Task 7 — Add Black formatting inspection
+### Task 7 — Apply Black formatting
 
-**Purpose:** Allow external inspectors to check Python formatting consistency without changing how the code runs.
+**Purpose:** Format Python source consistently for external inspection while preserving behaviour.
 
-**Command:**
+**Commands:**
 
 ```bash
+black src
 black --check src
 ```
 
-**Policy:** In an inspection-only pass, do not run `black src` or commit Black-generated source diffs unless a separate source-formatting branch is explicitly approved. Black formatting should be treated as a cosmetic follow-up because it may create large non-semantic changes.
+**Policy:** Black formatting is a cosmetic source change. It was applied only after explicit approval and verified with syntax/import/smoke checks.
 
-**Risk:** `black --check src` is read-only. `black src` modifies Python files and is therefore outside this documentation-only pass.
+**Risk:** Black changes source formatting but should not alter execution semantics. Behavioural changes remain out of scope.
 
 ---
 
@@ -171,7 +172,7 @@ Before directing collaborators/reviewers to the repository, verify:
 - [ ] listed files exist in the repository.
 - [ ] dependency installation works in a fresh Python 3.10/3.11 environment.
 - [ ] `python -m compileall -q src` succeeds.
-- [ ] `black --check src` has been run and any formatting findings are recorded without applying source changes.
+- [ ] `black --check src` succeeds after the approved formatting pass.
 - [ ] at least one short experiment script starts successfully after dependency installation.
 - [ ] README clearly warns that full experiments may be computationally expensive.
 - [ ] README clearly identifies scripts requiring generated `.npy` artefacts.

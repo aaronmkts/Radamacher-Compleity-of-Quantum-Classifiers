@@ -11,6 +11,7 @@ import torch
 
 pi = np.pi
 
+
 def gen_data(num_samples, dimensions):
 
     # Initialize data and labels
@@ -19,17 +20,25 @@ def gen_data(num_samples, dimensions):
 
     for i in range(num_samples):
         # Define the mean for each class
-        mu = pi*np.concatenate((np.ones(int(dimensions//2)),
-                                    (-np.ones(int(dimensions - dimensions//2))) ** y[i]))/4
-        
+        mu = (
+            pi
+            * np.concatenate(
+                (
+                    np.ones(int(dimensions // 2)),
+                    (-np.ones(int(dimensions - dimensions // 2))) ** y[i],
+                )
+            )
+            / 4
+        )
+
         # Covariance is identity matrix
         cov = 0.1 * np.eye(dimensions)
-        
+
         # Generate data point
         x[i, :] = np.random.multivariate_normal(mu, cov)
 
     # Convert to torch tensors
     x = torch.tensor(x, dtype=torch.float32)
     y = torch.tensor(y, dtype=torch.int64)
-    
+
     return x, y
