@@ -4,16 +4,17 @@ import os
 os.environ["PYTHONBREAKPOINT"] = "ipdb.set_trace"
 sys.path.append(
     os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "..",
+        os.path.dirname(os.path.realpath(__file__)),
+        "..",
     )
 )
 
-#from codebase.datasets import gen_data
+# from codebase.datasets import gen_data
 from codebase.train import train
 from codebase.model import get_classifier
 from codebase.adversary import get_attack
 
-#Default Imports
+# Default Imports
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -23,7 +24,8 @@ import torch.optim as optim
 import pennylane as qml
 import functools
 import operator
-#seed for reproducibility
+
+# seed for reproducibility
 seed = 42
 np.random.seed(seed)
 torch.manual_seed(seed)
@@ -31,8 +33,9 @@ torch.manual_seed(seed)
 
 # Custom loss function
 def loss_func(expvals, labels, alpha=10):
-    loss = torch.mean(1 / (1 + torch.exp(alpha*labels * expvals)))
+    loss = torch.mean(1 / (1 + torch.exp(alpha * labels * expvals)))
     return loss
+
 
 # Simple classifier model
 class QuantumClassifier(nn.Module):
@@ -45,24 +48,29 @@ class QuantumClassifier(nn.Module):
         self.device = qml.device("default.qubit", wires=num_qubits)
 
         paulis = [qml.PauliZ(i) for i in range(self.num_qubits)]
-        self.observable =  functools.reduce(operator.matmul, paulis)
+        self.observable = functools.reduce(operator.matmul, paulis)
+
         # Define the quantum circuit
         @qml.qnode(self.device, interface="torch", diff_method="backprop")
         def quantum_circuit(inputs, weights):
             # Apply angle embedding
             for i in range(self.num_qubits):
                 qml.RY(inputs[i], wires=i)
-            #qml.AmplitudeEmbedding(features=inputs, wires=range(self.num_qubits), normalize=True)
+            # qml.AmplitudeEmbedding(features=inputs, wires=range(self.num_qubits), normalize=True)
             # Apply variational layers
-            qml.templates.StronglyEntanglingLayers(weights, wires=range(self.num_qubits))
-            
+            qml.templates.StronglyEntanglingLayers(
+                weights, wires=range(self.num_qubits)
+            )
+
             # Measure expectation of Z on the first qubit
-            return qml.expval(qml.PauliZ(num_qubits//2))
+            return qml.expval(qml.PauliZ(num_qubits // 2))
 
         self.quantum_circuit = quantum_circuit
 
         # Initialize the weights for the quantum circuit
-        num_weights = qml.templates.StronglyEntanglingLayers.shape(self.num_layers, self.num_qubits)
+        num_weights = qml.templates.StronglyEntanglingLayers.shape(
+            self.num_layers, self.num_qubits
+        )
         self.weights = nn.Parameter(torch.randn(num_weights))
 
     def forward(self, x):
@@ -72,6 +80,7 @@ class QuantumClassifier(nn.Module):
             outputs.append(output)
         return torch.stack(outputs)
 
+
 def gen_data(num_samples, dimensions):
 
     # Initialize data and labels
@@ -80,22 +89,42 @@ def gen_data(num_samples, dimensions):
 
     for i in range(num_samples):
         # Define the mean for each class
-        mu = np.pi*np.concatenate((np.ones(int(dimensions//2)),
-                                    (-np.ones(int(dimensions - dimensions//2))) ** y[i]))/4
-        
+        mu = (
+            np.pi
+            * np.concatenate(
+                (
+                    np.ones(int(dimensions // 2)),
+                    (-np.ones(int(dimensions - dimensions // 2))) ** y[i],
+                )
+            )
+            / 4
+        )
+
         # Covariance is identity matrix
         cov = 0.1 * np.eye(dimensions)
-        
+
         # Generate data point
         x[i, :] = np.random.multivariate_normal(mu, cov)
 
     # Convert to torch tensors
     x = torch.tensor(x, dtype=torch.float32)
     y = torch.tensor(y, dtype=torch.int64)
-    
+
     return x, y
+
+
 # Training function
-def train_adv_model(classifier, train_loader, test_loader, epochs, learning_rate, device, attacker, epsilon, compare):
+def train_adv_model(
+    classifier,
+    train_loader,
+    test_loader,
+    epochs,
+    learning_rate,
+    device,
+    attacker,
+    epsilon,
+    compare,
+):
     optimizer = optim.Adam(classifier.parameters(), lr=learning_rate)
 
     attacker_cls = get_attack(attacker)
@@ -103,19 +132,23 @@ def train_adv_model(classifier, train_loader, test_loader, epochs, learning_rate
     test_accuracies = []
 
     if compare:
-        train_loss_epoch = 1.
-        epoch_num=1
-        while (train_loss_epoch>0.251 and epoch_num<=15):
-            epoch_num +=1
+        train_loss_epoch = 1.0
+        epoch_num = 1
+        while train_loss_epoch > 0.251 and epoch_num <= 15:
+            epoch_num += 1
             classifier.train()
             train_loss_epoch = 0.0
 
             for inputs, labels in train_loader:
                 inputs, labels = inputs.to(device), labels.to(device)
-                labels = torch.where(labels == 0, 1, -1).float()  # Map labels {0, 1} -> {1, -1}
+                labels = torch.where(
+                    labels == 0, 1, -1
+                ).float()  # Map labels {0, 1} -> {1, -1}
 
                 # Generate adversarial examples
-                inputs_adv = attacker_cls(classifier, inputs, labels, loss_func, epsilon)
+                inputs_adv = attacker_cls(
+                    classifier, inputs, labels, loss_func, epsilon
+                )
 
                 optimizer.zero_grad()
                 outputs = classifier(inputs_adv).view(-1)
@@ -131,12 +164,14 @@ def train_adv_model(classifier, train_loader, test_loader, epochs, learning_rate
             train_losses.append(train_loss_epoch)
 
         # Evaluate accuracy on the test set
-        test_accuracy, test_loss = evaluate_model(classifier, test_loader, device, epsilon, attacker)
+        test_accuracy, test_loss = evaluate_model(
+            classifier, test_loader, device, epsilon, attacker
+        )
 
-        if epoch_num<=15:
+        if epoch_num <= 15:
             return train_losses[-1], test_loss
 
-        return -1., -1.
+        return -1.0, -1.0
     else:
         for epoch in range(epochs):
             classifier.train()
@@ -144,10 +179,14 @@ def train_adv_model(classifier, train_loader, test_loader, epochs, learning_rate
 
             for inputs, labels in train_loader:
                 inputs, labels = inputs.to(device), labels.to(device)
-                labels = torch.where(labels == 0, 1, -1).float()  # Map labels {0, 1} -> {1, -1}
+                labels = torch.where(
+                    labels == 0, 1, -1
+                ).float()  # Map labels {0, 1} -> {1, -1}
 
                 # Generate adversarial examples
-                inputs_adv = attacker_cls(classifier, inputs, labels, loss_func, epsilon)
+                inputs_adv = attacker_cls(
+                    classifier, inputs, labels, loss_func, epsilon
+                )
 
                 optimizer.zero_grad()
                 outputs = classifier(inputs_adv).view(-1)
@@ -163,12 +202,17 @@ def train_adv_model(classifier, train_loader, test_loader, epochs, learning_rate
             train_losses.append(train_loss_epoch)
 
             # Evaluate accuracy on the test set
-            test_accuracy, test_loss = evaluate_model(classifier, test_loader, device, epsilon, attacker)
+            test_accuracy, test_loss = evaluate_model(
+                classifier, test_loader, device, epsilon, attacker
+            )
             test_accuracies.append(test_accuracy)
 
-            print(f"Epoch [{epoch + 1}/{epochs}] - Loss: {train_loss_epoch:.4f}, Test Accuracy: {test_accuracy:.2f}%")
+            print(
+                f"Epoch [{epoch + 1}/{epochs}] - Loss: {train_loss_epoch:.4f}, Test Accuracy: {test_accuracy:.2f}%"
+            )
 
         return train_losses, test_accuracies
+
 
 # Evaluation function
 def evaluate_model(classifier, test_loader, device, epsilon, attacker):
@@ -181,21 +225,20 @@ def evaluate_model(classifier, test_loader, device, epsilon, attacker):
     for inputs, labels in test_loader:
         inputs, labels = inputs.to(device), labels.to(device)
 
-        
         inputs_adv = attacker_cls(classifier, inputs, labels, loss_func, epsilon)
 
         outputs = classifier(inputs_adv).view(-1).detach()
         labels = torch.where(labels == 0, 1, -1).float()
         losses.append(torch.sum(loss_func(outputs, labels)))
 
-
         predictions = torch.sign(outputs)  # Convert outputs to binary predictions
         correct += (predictions == labels).sum().item()
         total += labels.size(0)
 
-
     accuracy = 100 * correct / total
-    return accuracy, np.sum(losses)/500.
+    return accuracy, np.sum(losses) / 500.0
+
+
 """
 # Plotting function
 def plot_results(train_losses, test_accuracies):
@@ -221,25 +264,27 @@ def plot_results(train_losses, test_accuracies):
     plt.tight_layout()
     plt.show()
 """
+
+
 # Main function
 def main():
     # Parameters
     num_train_samples = 1000
     num_test_samples = 500
     batch_size = 25
-    #dimension = 4  # Separation between Gaussian peaks
+    # dimension = 4  # Separation between Gaussian peaks
     epochs = 35
     learning_rate = 0.01
-    #num_qubits = 16  # Data is 2D
+    # num_qubits = 16  # Data is 2D
     num_layers = 2
     attacker = "l_2"
     epsilon = 0.05
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # control variables
     dimensions_list = [2, 4, 8, 16]
-    embeddings_list = ['angle', 'amplitude']
-    loss_differences_dict = {'angle': [], 'amplitude': []}
+    embeddings_list = ["angle", "amplitude"]
+    loss_differences_dict = {"angle": [], "amplitude": []}
 
     plt.figure()
 
@@ -264,25 +309,38 @@ def main():
 
                 train_dataset = TensorDataset(x_train, y_train)
                 test_dataset = TensorDataset(x_test, y_test)
-                train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-                test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+                train_loader = DataLoader(
+                    train_dataset, batch_size=batch_size, shuffle=True
+                )
+                test_loader = DataLoader(
+                    test_dataset, batch_size=batch_size, shuffle=False
+                )
 
-                if name == 'angle':
+                if name == "angle":
                     num_qubits = dimensions
                 else:
                     num_qubits = int(np.ceil(np.log2(dimensions)))
 
                 # Initialize classifier
-                classifier = QuantumClassifier(num_qubits=num_qubits, num_layers=num_layers)
+                classifier = QuantumClassifier(
+                    num_qubits=num_qubits, num_layers=num_layers
+                )
 
                 # Train the model
-                train_loss, test_loss = train_adv_model(classifier, train_loader, test_loader,
-                                                                epochs, learning_rate, device,
-                                                                attacker, epsilon, True)
+                train_loss, test_loss = train_adv_model(
+                    classifier,
+                    train_loader,
+                    test_loader,
+                    epochs,
+                    learning_rate,
+                    device,
+                    attacker,
+                    epsilon,
+                    True,
+                )
 
-                if train_loss > -1.:
+                if train_loss > -1.0:
                     loss_differences_runs.append(np.absolute(test_loss - train_loss))
-
 
             # max of loss differences over runs indicates worst case generalization
             loss_differences.append(np.mean(loss_differences_runs))
@@ -290,16 +348,14 @@ def main():
             # After processing all dimensions for this embedding, store the loss_differences
         loss_differences_dict[name] = loss_differences
 
-        plt.plot(dimensions_list, loss_differences_dict[name], marker='o', label=name)
+        plt.plot(dimensions_list, loss_differences_dict[name], marker="o", label=name)
 
-    plt.xlabel('Dimensions (d)')
-    plt.ylabel('Test Loss (Max over 5 runs)')
-    plt.title('Max Modulus of Loss Difference vs Dimensions')
+    plt.xlabel("Dimensions (d)")
+    plt.ylabel("Test Loss (Max over 5 runs)")
+    plt.title("Max Modulus of Loss Difference vs Dimensions")
     plt.grid(True)
     plt.legend()
     plt.show()
-
-
 
     """
     # Generate data
@@ -323,5 +379,6 @@ def main():
     plot_results(train_losses, test_accuracies)
     """
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

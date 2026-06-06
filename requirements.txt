@@ -4,3 +4,6 @@ torch
 matplotlib
 datasets
 ipdb
+scipy
+numdifftools
+black

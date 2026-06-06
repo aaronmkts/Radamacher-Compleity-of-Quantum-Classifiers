@@ -4,7 +4,8 @@ import os
 os.environ["PYTHONBREAKPOINT"] = "ipdb.set_trace"
 sys.path.append(
     os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "..",
+        os.path.dirname(os.path.realpath(__file__)),
+        "..",
     )
 )
 
@@ -31,15 +32,16 @@ np.random.seed(seed)
 torch.manual_seed(seed)
 
 
-
 # Custom loss function
 def loss_func(expvals, labels, alpha=10):
-    loss = (1 / (1 + torch.exp(alpha * labels * expvals)))
+    loss = 1 / (1 + torch.exp(alpha * labels * expvals))
     return loss
+
 
 def risk(expvals, labels, alpha=10):
     loss = torch.mean((1 / (1 + torch.exp(alpha * labels * expvals))))
     return loss
+
 
 def gen_data(num_samples, dimensions):
     # Initialize data and labels
@@ -48,11 +50,19 @@ def gen_data(num_samples, dimensions):
 
     for i in range(num_samples):
         # Define the mean for each class
-        mu = np.pi * np.concatenate((np.ones(int(dimensions // 2)),
-                                     (-np.ones(int(dimensions - dimensions // 2))) ** y[i])) / 4
+        mu = (
+            np.pi
+            * np.concatenate(
+                (
+                    np.ones(int(dimensions // 2)),
+                    (-np.ones(int(dimensions - dimensions // 2))) ** y[i],
+                )
+            )
+            / 4
+        )
 
         # Covariance is identity matrix
-        cov = np.pi * np.eye(dimensions)/8
+        cov = np.pi * np.eye(dimensions) / 8
 
         # Generate data point
         x[i, :] = np.random.multivariate_normal(mu, cov)
@@ -69,7 +79,7 @@ class QuantumClassifier(nn.Module):
     def __init__(self, embedding, data_dim, num_layers):
         super(QuantumClassifier, self).__init__()
         self.embedding = embedding
-        if self.embedding == 'angle':
+        if self.embedding == "angle":
             self.num_qubits = data_dim
         else:
             self.num_qubits = int(np.ceil(np.log2(data_dim)))
@@ -81,29 +91,39 @@ class QuantumClassifier(nn.Module):
 
         paulis = [qml.PauliZ(i) for i in range(self.num_qubits)]
         self.observable = functools.reduce(operator.matmul, paulis)
-        num_weights = qml.templates.StronglyEntanglingLayers.shape(self.num_layers, self.num_qubits)
+        num_weights = qml.templates.StronglyEntanglingLayers.shape(
+            self.num_layers, self.num_qubits
+        )
         self.weights = nn.Parameter(torch.randn(num_weights))
 
         # Define the quantum circuit
         @qml.qnode(self.device, interface="torch", diff_method="backprop")
         def embedding(inputs):
-            if self.embedding == 'angle':
-                for i in range(self.num_qubits): # Apply angle embedding
+            if self.embedding == "angle":
+                for i in range(self.num_qubits):  # Apply angle embedding
                     qml.RY(inputs[i], wires=i)
             else:
-                qml.AmplitudeEmbedding(features=inputs, wires=range(self.num_qubits), normalize=True, pad_with=0.)
+                qml.AmplitudeEmbedding(
+                    features=inputs,
+                    wires=range(self.num_qubits),
+                    normalize=True,
+                    pad_with=0.0,
+                )
 
             return qml.density_matrix(range(self.num_qubits))
-
 
         @qml.qnode(self.device, interface="torch", diff_method="backprop")
         def circuit(state, adv_weights=torch.zeros(self.num_qubits, 3), full_forw=True):
             qml.QubitDensityMatrix(state, wires=range(self.num_qubits))
             for j in range(self.num_qubits):
-                qml.Rot(adv_weights[j][0], adv_weights[j][1], adv_weights[j][2], wires=j)
+                qml.Rot(
+                    adv_weights[j][0], adv_weights[j][1], adv_weights[j][2], wires=j
+                )
 
             if full_forw:
-                qml.templates.StronglyEntanglingLayers(self.weights, wires=range(self.num_qubits))
+                qml.templates.StronglyEntanglingLayers(
+                    self.weights, wires=range(self.num_qubits)
+                )
 
             return qml.density_matrix(range(self.num_qubits))
 
@@ -112,17 +132,25 @@ class QuantumClassifier(nn.Module):
 
         # Initialize the weights for the quantum circuit
 
-
     def forward(self, x):
         outputs = []
         for i in range(len(x)):  # Iterate over the batch
-            #print(x[i].size())
-            outputs.append(torch.trace(torch.matmul(x[i].to(torch.complex64), torch.tensor(self.observable.matrix(), dtype=torch.complex64))).to(torch.float64))
+            # print(x[i].size())
+            outputs.append(
+                torch.trace(
+                    torch.matmul(
+                        x[i].to(torch.complex64),
+                        torch.tensor(self.observable.matrix(), dtype=torch.complex64),
+                    )
+                ).to(torch.float64)
+            )
 
         return torch.stack(outputs)
 
 
-def train_adv_model(model, l_min, train_loader, epochs, learning_rate, device, attacker, epsilon):
+def train_adv_model(
+    model, l_min, train_loader, epochs, learning_rate, device, attacker, epsilon
+):
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     attacker_cls = get_attack(attacker)
     train_losses = []
@@ -159,6 +187,7 @@ def train_adv_model(model, l_min, train_loader, epochs, learning_rate, device, a
 
     return model
 
+
 def evaluate(model, l_min, train_loader, test_loader, device, attacker, epsilon):
 
     attacker_cls = get_attack(attacker)
@@ -166,13 +195,17 @@ def evaluate(model, l_min, train_loader, test_loader, device, attacker, epsilon)
     model.eval()
     state_dim = 2**num_qubits
 
-    #evaluation
-    train_loss = 0.
-    adv_train_loss = 0.
+    # evaluation
+    train_loss = 0.0
+    adv_train_loss = 0.0
     for inputs, labels in train_loader:
         inputs, labels = inputs.to(device), labels.to(device)
 
-        states = [(1-l_min*state_dim)*model.embedding(x).to(torch.complex64)+l_min*torch.eye(state_dim, dtype=torch.complex64) for x in inputs]
+        states = [
+            (1 - l_min * state_dim) * model.embedding(x).to(torch.complex64)
+            + l_min * torch.eye(state_dim, dtype=torch.complex64)
+            for x in inputs
+        ]
         forw_states = [model.circuit(x).to(torch.complex64) for x in states]
 
         outputs = model.forward(forw_states)
@@ -181,7 +214,7 @@ def evaluate(model, l_min, train_loader, test_loader, device, attacker, epsilon)
         adv_states = attacker_cls(model, l_min, inputs, labels, loss_func, epsilon)
         outputs_adv = model.forward(adv_states)
 
-        #print(outputs_adv-outputs)
+        # print(outputs_adv-outputs)
 
         # Compute custom loss
         loss = risk(outputs, labels)
@@ -193,13 +226,16 @@ def evaluate(model, l_min, train_loader, test_loader, device, attacker, epsilon)
     train_loss /= len(train_loader)
     adv_train_loss /= len(train_loader)
 
-    adv_test_loss = 0.
-    test_loss = 0.
+    adv_test_loss = 0.0
+    test_loss = 0.0
 
     for inputs, labels in test_loader:
         inputs, labels = inputs.to(device), labels.to(device)
-        states = [(1 - l_min * state_dim) * model.embedding(x).to(torch.complex64) + l_min * torch.eye(state_dim) for x
-                  in inputs]
+        states = [
+            (1 - l_min * state_dim) * model.embedding(x).to(torch.complex64)
+            + l_min * torch.eye(state_dim)
+            for x in inputs
+        ]
         forw_states = [model.circuit(x) for x in states]
 
         adv_states = attacker_cls(model, l_min, inputs, labels, loss_func, epsilon)
@@ -213,21 +249,21 @@ def evaluate(model, l_min, train_loader, test_loader, device, attacker, epsilon)
         loss = risk(outputs_adv, labels)
         adv_test_loss += loss.item()
 
-
     test_loss /= len(test_loader)
     adv_test_loss /= len(test_loader)
 
     return adv_train_loss, train_loss, adv_test_loss, test_loss
 
+
 def main2():
-    num_test_samples=200
+    num_test_samples = 200
     dimension = 6
     embedding = "amplitude"
     epsilon = 0.08
     lambda_min = 0.09
     num_layers = 4
     batch_size = 5
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     attacker = "QFGSM"
 
     x = torch.tensor(np.load("x_r=30_d=6_m=20.npy")[3])
@@ -242,18 +278,23 @@ def main2():
 
     test_dataset = TensorDataset(x_test, y_test)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    #print(y)
+    # print(y)
 
-    model = QuantumClassifier(embedding=embedding, data_dim=dimension, num_layers=num_layers)
+    model = QuantumClassifier(
+        embedding=embedding, data_dim=dimension, num_layers=num_layers
+    )
 
-    model = train_adv_model(model, 0., train_loader, 20, 0.1, device, attacker, epsilon)
-    adv_train, train, adv_test, test = evaluate(model, lambda_min, train_loader, test_loader, device, attacker, epsilon)
+    model = train_adv_model(
+        model, 0.0, train_loader, 20, 0.1, device, attacker, epsilon
+    )
+    adv_train, train, adv_test, test = evaluate(
+        model, lambda_min, train_loader, test_loader, device, attacker, epsilon
+    )
 
-    print("Adversarial",adv_test,adv_train)
-    print("Standard", test,train)
-    #plt.plot(train_losses_ep)
-    #plt.show()
-
+    print("Adversarial", adv_test, adv_train)
+    print("Standard", test, train)
+    # plt.plot(train_losses_ep)
+    # plt.show()
 
 
 def main1():
@@ -266,10 +307,10 @@ def main1():
     learning_rate = 0.1
     num_layers = 4
     attacker = "QFGSM"
-    #epsilon = 0.04
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # epsilon = 0.04
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     runs = 20
-    embedding = 'amplitude'
+    embedding = "amplitude"
 
     """ 
     # control variables
@@ -372,25 +413,28 @@ def main1():
     # control variables
     dimensions = 6
     lambda_min = 0.011
-    epsilons = np.linspace(0.001, lambda_min-0.001, 8)
+    epsilons = np.linspace(0.001, lambda_min - 0.001, 8)
     eez = len(epsilons)
     l_mins = [0.0, lambda_min]
 
     noiseless = np.zeros((runs, eez, 4))
     noisy = np.zeros((runs, eez, 4))
 
-
     for run in range(runs):
         print(f"Run {run + 1}/{runs}")
-        classifier = QuantumClassifier(embedding=embedding, data_dim=dimensions, num_layers=num_layers)
+        classifier = QuantumClassifier(
+            embedding=embedding, data_dim=dimensions, num_layers=num_layers
+        )
 
         x_test, y_test = gen_data(num_test_samples, dimensions)
         y_test = torch.where(y_test == 0, 1, -1).float()
-        x = np.load(f'x_r=30_d={dimensions}_m=20.npy')
+        x = np.load(f"x_r=30_d={dimensions}_m=20.npy")
         x_train = torch.tensor(x[run], dtype=torch.float64)
-        y = np.load(f'y_r=30_d={dimensions}_m=20.npy')
+        y = np.load(f"y_r=30_d={dimensions}_m=20.npy")
         y_train = torch.tensor(y[run], dtype=torch.float64)
-        y_train = torch.where(y_train == 0, 1, -1).float()  # Map labels {0, 1} -> {1, -1}
+        y_train = torch.where(
+            y_train == 0, 1, -1
+        ).float()  # Map labels {0, 1} -> {1, -1}
         for l_min in l_mins:
             print(f"\nProcessing noise level: {l_min}")
 
@@ -400,20 +444,40 @@ def main1():
 
                 train_dataset = TensorDataset(x_train, y_train)
                 test_dataset = TensorDataset(x_test, y_test)
-                train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-                test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+                train_loader = DataLoader(
+                    train_dataset, batch_size=batch_size, shuffle=False
+                )
+                test_loader = DataLoader(
+                    test_dataset, batch_size=batch_size, shuffle=False
+                )
 
                 # Adversarial Training
 
-                if ((i == 0) and (l_min==0.)):
-                    classifier = train_adv_model(classifier, 0., train_loader, epochs, learning_rate, device, attacker, epsilon)
+                if (i == 0) and (l_min == 0.0):
+                    classifier = train_adv_model(
+                        classifier,
+                        0.0,
+                        train_loader,
+                        epochs,
+                        learning_rate,
+                        device,
+                        attacker,
+                        epsilon,
+                    )
 
-                adv_train, train, adv_test, test = evaluate(classifier, l_min, train_loader, test_loader, device, attacker, epsilon)
+                adv_train, train, adv_test, test = evaluate(
+                    classifier,
+                    l_min,
+                    train_loader,
+                    test_loader,
+                    device,
+                    attacker,
+                    epsilon,
+                )
 
                 losses = np.array([adv_train, train, adv_test, test])
 
-
-                if l_min == 0.:
+                if l_min == 0.0:
                     noiseless[run][i] = losses
                 else:
                     noisy[run][i] = losses
@@ -441,41 +505,53 @@ def main1():
 
 def main():
     runs = 20
-    num_layers=4
+    num_layers = 4
     lambda_min = 0.011
     l_mins = [0.0, lambda_min]
     d_H = 8
     epsilons = np.linspace(0.001, lambda_min - 0.001, 8)
     eez = len(epsilons)
     inputs = np.load("x_r=30_d=6_m=20.npy")
-    embedding='amplitude'
+    embedding = "amplitude"
     model = QuantumClassifier(embedding=embedding, data_dim=6, num_layers=num_layers)
 
     for l_min in l_mins:
         for i in range(runs):
             x_train = torch.tensor(inputs[i])
 
-        if l_min==0.:
+        if l_min == 0.0:
             excess = epsilons * d_H**2 / np.sqrt(20)
         else:
             excess = epsilons * d_H / np.sqrt(20)
-        states = torch.stack([torch.pow((1 - l_min * d_H) * model.embedding(x).to(torch.complex64) + l_min * torch.eye(d_H), 2) for x
-                      in x_train])
+        states = torch.stack(
+            [
+                torch.pow(
+                    (1 - l_min * d_H) * model.embedding(x).to(torch.complex64)
+                    + l_min * torch.eye(d_H),
+                    2,
+                )
+                for x in x_train
+            ]
+        )
 
+        rad = (
+            torch.sum(
+                torch.sqrt(torch.abs(torch.linalg.eigvals(torch.sum(states, 0))))
+            ).to(torch.float64)
+            / 20
+        )
 
+        adv_gen = 2 * 2.5 * (rad + excess)
+        gen = 2 * 2.5 * rad * np.ones_like(adv_gen)
 
-        rad = torch.sum(torch.sqrt(torch.abs(torch.linalg.eigvals(torch.sum(states, 0))))).to(torch.float64)/20
-
-        adv_gen = 2*2.5*(rad+excess)
-        gen = 2*2.5*rad*np.ones_like(adv_gen)
-
-        if l_min==0.:
+        if l_min == 0.0:
             np.save("noiseless_adv_th", adv_gen)
             np.save("noiseless_th", gen)
         else:
             np.save("noisy_adv_th", adv_gen)
-            np.save("noisy_adv_th3", gen+5*excess*d_H)
+            np.save("noisy_adv_th3", gen + 5 * excess * d_H)
             np.save("noisy_th", gen)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

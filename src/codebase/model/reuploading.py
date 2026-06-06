@@ -13,6 +13,7 @@ class Reuploading_classifier(torch.nn.Module):
         num_qubits: the number of qubits in the circuit
         num_layers: the number of layers within the StronglyEntanglingLayers template
     """
+
     def __init__(self, num_qubits, num_layers, num_reup):
         super().__init__()
         torch.manual_seed(1337)  # fixed seed for reproducibility

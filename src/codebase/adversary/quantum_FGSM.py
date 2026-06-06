@@ -28,16 +28,18 @@ class QuantumAdversary(nn.Module):
 
 
 def loss_arg(labels, outputs):
-    return torch.mean(labels*outputs)
+    return torch.mean(labels * outputs)
 
 
 def quantum_attack(model, states, labels, loss_func, epsilon, alpha=0.1):
 
-    num_qubits = getattr(model, 'num_qubits')
+    num_qubits = getattr(model, "num_qubits")
     attacker = QuantumAdversary(num_qubits=num_qubits)
     weights = torch.zeros((len(labels), num_qubits, 3)).requires_grad_(True)
 
-    adv_states = [attacker.quantum_adversary(states[i], weights[i]) for i in range(len(labels))]
+    adv_states = [
+        attacker.quantum_adversary(states[i], weights[i]) for i in range(len(labels))
+    ]
 
     outputs = model.forward_quantum(adv_states)
     model.zero_grad()
@@ -45,12 +47,17 @@ def quantum_attack(model, states, labels, loss_func, epsilon, alpha=0.1):
     loss.backward()
 
     with torch.no_grad():
-        perturbations = -alpha*weights.grad.sign()
+        perturbations = -alpha * weights.grad.sign()
 
-    adv_states = [attacker.quantum_adversary(states[i], perturbations[i]) for i in range(len(labels))]
+    adv_states = [
+        attacker.quantum_adversary(states[i], perturbations[i])
+        for i in range(len(labels))
+    ]
 
     for i in range(len(labels)):
-        while (epsilon - np.sum(np.abs(np.linalg.eigvals(adv_states[i]-states[i])))<0.):
+        while (
+            epsilon - np.sum(np.abs(np.linalg.eigvals(adv_states[i] - states[i]))) < 0.0
+        ):
             perturbations[i] /= 2
 
     adv_states = attacker.quantum_adversary(states, perturbations)

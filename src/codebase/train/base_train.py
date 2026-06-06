@@ -2,21 +2,23 @@ import sys
 import os
 
 # Add the parent directory to the system path to resolve the import issue
-parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
 
 import torch
 import torch.optim as optim
 import numpy as np
-from torch.utils.data import  DataLoader
+from torch.utils.data import DataLoader
 
 seed = 42
 np.random.seed(seed)
 torch.manual_seed(seed)
 
+
 def loss_func(expvals, labels):
     loss = torch.mean(1 / (1 + torch.exp(labels * expvals)))
     return loss
+
 
 def train(classifier, train_dataset, epochs, learning_rate, batch_size):
 
@@ -53,8 +55,10 @@ def train(classifier, train_dataset, epochs, learning_rate, batch_size):
         train_loss_epoch /= len(train_loader)
         loss_per_epoch.append(train_loss_epoch)
 
-        print(f'Epoch [{epoch + 1}/{epochs}] completed. Train Loss: {train_loss_epoch:.4f}')
+        print(
+            f"Epoch [{epoch + 1}/{epochs}] completed. Train Loss: {train_loss_epoch:.4f}"
+        )
 
-    print('Training Finished.')
+    print("Training Finished.")
 
     return classifier, np.array(loss_per_epoch)

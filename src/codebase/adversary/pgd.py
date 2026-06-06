@@ -17,6 +17,8 @@ def PGD(model, feats, loss_func, labels, epsilon=0.1, alpha=0.01, num_iter=10):
         l.backward()
 
         # use gradients with respect to inputs and clip the results to lie within the epsilon boundary
-        delta.data = (delta + alpha * delta.grad.detach().sign()).clamp(-epsilon, epsilon)
+        delta.data = (delta + alpha * delta.grad.detach().sign()).clamp(
+            -epsilon, epsilon
+        )
         delta.grad.zero_()
     return delta.detach()

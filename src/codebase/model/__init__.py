@@ -1,8 +1,7 @@
-
-
 from .angle import AngleEmbeddingClassifier
 from .amplitude import AmplitudeEmbeddingClassifier
 from .reuploading import Reuploading_classifier
+
 
 def get_classifier(name: str):
     match name:
